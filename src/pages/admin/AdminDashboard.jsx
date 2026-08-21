@@ -26,7 +26,6 @@ import { getCars } from '../../services/carService';
 import { getCustomers } from '../../services/customerService';
 import { getApplications, getApplicationStats } from '../../services/applicationService';
 import { formatCurrency } from '../../utils/calculations';
-import DashboardCards from '../../components/dashboard/DashboardCards';
 import RecentOrders from '../../components/dashboard/RecentOrders';
 import RecentActivity from '../../components/dashboard/RecentActivity';
 
@@ -59,7 +58,7 @@ const AdminDashboard = () => {
 
     // Calculate estimated profit
     const totalProfit = cars.reduce((sum, car) => {
-      return sum + (car.sellingPrice - car.purchaseRate);
+      return sum + ((car.sellingPrice || 0) - (car.purchaseRate || 0));
     }, 0);
 
     setStats({
@@ -67,7 +66,7 @@ const AdminDashboard = () => {
       availableCars: available,
       reservedSold,
       totalCustomers: customers.length,
-      pendingApplications: appStats.pending,
+      pendingApplications: appStats.pending || 0,
       estimatedProfit: totalProfit,
       lowStock,
     });
@@ -117,10 +116,18 @@ const AdminDashboard = () => {
     },
   ];
 
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+        <Typography>Loading dashboard...</Typography>
+      </Box>
+    );
+  }
+
   return (
     <Box>
       <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" gutterBottom fontWeight="bold">
+        <Typography variant="h4" fontWeight="bold" gutterBottom>
           Admin Dashboard
         </Typography>
         <Typography variant="body1" color="textSecondary">
@@ -135,7 +142,7 @@ const AdminDashboard = () => {
             <Card
               sx={{
                 height: '100%',
-                transition: 'transform 0.2s',
+                transition: 'transform 0.2s, box-shadow 0.2s',
                 '&:hover': {
                   transform: 'translateY(-4px)',
                   boxShadow: 4,
@@ -162,7 +169,7 @@ const AdminDashboard = () => {
                   </Box>
                   <Box
                     sx={{
-                      p: 1,
+                      p: 1.5,
                       borderRadius: 2,
                       bgcolor: `${card.color}15`,
                       color: card.color,
@@ -197,7 +204,7 @@ const AdminDashboard = () => {
         </Card>
       )}
 
-      {/* Charts and Recent Activity */}
+      {/* Recent Activity Section */}
       <Grid container spacing={3} sx={{ mt: 1 }}>
         <Grid item xs={12} md={6}>
           <Card>

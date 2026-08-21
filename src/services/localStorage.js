@@ -46,9 +46,23 @@ export const generateId = (prefix = '') => {
 };
 
 export const seedInitialData = (seedData) => {
-  Object.keys(seedData).forEach((key) => {
-    if (!localStorage.getItem(key)) {
-      setData(key, seedData[key]);
-    }
-  });
+  try {
+    let hasNewData = false;
+    Object.keys(seedData).forEach((key) => {
+      if (!localStorage.getItem(key)) {
+        setData(key, seedData[key]);
+        hasNewData = true;
+        console.log(`Seeded ${key} with ${seedData[key].length} items`);
+      }
+    });
+    return hasNewData;
+  } catch (error) {
+    console.error('Error seeding data:', error);
+    return false;
+  }
+};
+
+// Check if data exists
+export const hasData = (key) => {
+  return localStorage.getItem(key) !== null;
 };

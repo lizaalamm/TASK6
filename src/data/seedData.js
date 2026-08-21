@@ -118,11 +118,12 @@ export const seedCars = [
     engine: '1800cc',
     images: [
       'https://images.unsplash.com/photo-1621007947382-bb3c3994e3fb?w=800',
-      'https://images.unsplash.com/photo-1581540222194-0def2dda95b8?w=800',
     ],
     description: 'The Toyota Corolla Grande offers premium comfort and advanced safety features.',
     status: 'Available',
     supplierId: seedSuppliers[0].id,
+    profit: 750000,
+    profitMargin: 10.34,
   },
   {
     id: generateId('CAR'),
@@ -140,11 +141,12 @@ export const seedCars = [
     engine: '1500cc',
     images: [
       'https://images.unsplash.com/photo-1590362891991-f776e747a589?w=800',
-      'https://images.unsplash.com/photo-1625654076126-1ec9c41edc9d?w=800',
     ],
     description: 'The Honda Civic VTi combines sporty design with excellent fuel efficiency.',
     status: 'Available',
     supplierId: seedSuppliers[1].id,
+    profit: 800000,
+    profitMargin: 10.53,
   },
   {
     id: generateId('CAR'),
@@ -166,6 +168,8 @@ export const seedCars = [
     description: 'The Suzuki Swift GLX is a compact hatchback with sporty performance.',
     status: 'Available',
     supplierId: seedSuppliers[2].id,
+    profit: 400000,
+    profitMargin: 9.52,
   },
   {
     id: generateId('CAR'),
@@ -183,11 +187,12 @@ export const seedCars = [
     engine: '2000cc',
     images: [
       'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?w=800',
-      'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?w=800',
     ],
     description: 'The Kia Sportage AWD offers premium SUV experience with advanced technology.',
     status: 'Reserved',
     supplierId: seedSuppliers[3].id,
+    profit: 1000000,
+    profitMargin: 9.80,
   },
   {
     id: generateId('CAR'),
@@ -209,6 +214,8 @@ export const seedCars = [
     description: 'The Hyundai Elantra GLS is a stylish sedan with modern features.',
     status: 'Available',
     supplierId: seedSuppliers[4].id,
+    profit: 700000,
+    profitMargin: 11.29,
   },
   {
     id: generateId('CAR'),
@@ -226,11 +233,12 @@ export const seedCars = [
     engine: '2700cc',
     images: [
       'https://images.unsplash.com/photo-1593941707882-a5bba14938c7?w=800',
-      'https://images.unsplash.com/photo-1583121274602-3e2820c69888?w=800',
     ],
     description: 'The Toyota Fortuner V6 is a powerful SUV with off-road capability.',
     status: 'Sold',
     supplierId: seedSuppliers[0].id,
+    profit: 1300000,
+    profitMargin: 9.42,
   },
 ];
 

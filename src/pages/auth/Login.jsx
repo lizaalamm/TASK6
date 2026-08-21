@@ -1,68 +1,83 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Alert,
-  Avatar,
   Box,
-  Button,
   Card,
   CardContent,
-  IconButton,
-  InputAdornment,
   TextField,
+  Button,
   Typography,
+  Avatar,
+  Alert,
+  Paper,
+  InputAdornment,
+  IconButton,
+  Grid,
+  Divider,
 } from '@mui/material';
 import {
-  CarRental,
   Email,
   Lock,
   Visibility,
   VisibilityOff,
+  CarRental,
 } from '@mui/icons-material';
 import { useAuth } from '../../context/AuthContext';
 import { loginUser } from '../../services/authService';
 import { seedData } from '../../data/seedData';
-import { seedInitialData } from '../../services/localStorage';
+import { seedInitialData, getData } from '../../services/localStorage';
 
 const Login = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
-  const [formData, setFormData] = useState({ email: '', password: '' });
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+  });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    seedInitialData(seedData);
+    // Seed initial data on first load
+    console.log('Checking and seeding data...');
+    const seeded = seedInitialData(seedData);
+    if (seeded) {
+      console.log('Data seeded successfully!');
+      // Verify data was seeded
+      const cars = getData('udevs_cars', []);
+      console.log('Cars in localStorage:', cars.length);
+    }
   }, []);
 
-  const handleChange = (event) => {
-    const { name, value } = event.target;
-    setFormData((previous) => ({ ...previous, [name]: value }));
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
     setError('');
   };
 
-  const handleSubmit = async (event) => {
-    event.preventDefault();
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     setError('');
     setLoading(true);
 
     try {
-      const result = await loginUser(formData.email, formData.password);
-
-      if (!result.success) {
-        setError(result.message || 'Login failed');
-        return;
-      }
-
-      login(result.user);
-
-      if (result.user.role === 'customer') {
-        navigate('/customer-dashboard');
+      const result = loginUser(formData.email, formData.password);
+      
+      if (result.success) {
+        login(result.user);
+        // Redirect based on role
+        if (result.user.role === 'admin') {
+          navigate('/dashboard');
+        } else if (result.user.role === 'sales' || result.user.role === 'inventory') {
+          navigate('/dashboard');
+        } else if (result.user.role === 'customer') {
+          navigate('/customer-dashboard');
+        }
       } else {
-        navigate('/dashboard');
+        setError(result.message || 'Login failed');
       }
-    } catch (submitError) {
+    } catch (err) {
       setError('An error occurred during login');
     } finally {
       setLoading(false);
@@ -70,10 +85,10 @@ const Login = () => {
   };
 
   const demoCredentials = [
-    { role: 'Admin', email: 'admin@udevs.com', password: 'Admin@123' },
-    { role: 'Sales', email: 'sales@udevs.com', password: 'Sales@123' },
-    { role: 'Inventory', email: 'inventory@udevs.com', password: 'Inventory@123' },
-    { role: 'Customer', email: 'customer@udevs.com', password: 'Customer@123' },
+    { role: 'Admin', email: 'admin@udevs.com', password: 'Admin@123', color: '#5D4037' },
+    { role: 'Sales', email: 'sales@udevs.com', password: 'Sales@123', color: '#795548' },
+    { role: 'Inventory', email: 'inventory@udevs.com', password: 'Inventory@123', color: '#8D6E63' },
+    { role: 'Customer', email: 'customer@udevs.com', password: 'Customer@123', color: '#A1887F' },
   ];
 
   const fillCredentials = (email, password) => {
@@ -96,117 +111,124 @@ const Login = () => {
         sx={{
           maxWidth: 440,
           width: '100%',
-          p: 2,
+          p: 3,
           borderRadius: 4,
           boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
         }}
       >
         <CardContent>
-          <Box sx={{ textAlign: 'center', mb: 4 }}>
+          <Box sx={{ textAlign: 'center', mb: 3 }}>
             <Avatar
               sx={{
                 width: 72,
                 height: 72,
-                mx: 'auto',
+                bgcolor: 'primary.main',
+                margin: '0 auto',
                 mb: 2,
-                bgcolor: '#5D4037',
               }}
             >
-              <CarRental fontSize="large" />
+              <CarRental sx={{ fontSize: 40 }} />
             </Avatar>
-            <Typography variant="h4" fontWeight={700} color="#5D4037">
+            <Typography variant="h5" fontWeight="bold">
               Car Showroom
             </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Sign in to manage your showroom
+            <Typography variant="body2" color="textSecondary">
+              Sign in to your account
             </Typography>
           </Box>
 
-          <Box component="form" onSubmit={handleSubmit}>
-            {error && (
-              <Alert severity="error" sx={{ mb: 2 }}>
-                {error}
-              </Alert>
-            )}
+          {error && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {error}
+            </Alert>
+          )}
 
+          <form onSubmit={handleSubmit}>
             <TextField
               fullWidth
-              required
-              label="Email address"
+              label="Email"
               name="email"
               type="email"
               value={formData.email}
               onChange={handleChange}
               margin="normal"
-              autoComplete="username"
+              required
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
-                    <Email />
+                    <Email color="action" />
                   </InputAdornment>
                 ),
               }}
             />
-
             <TextField
               fullWidth
-              required
               label="Password"
               name="password"
               type={showPassword ? 'text' : 'password'}
               value={formData.password}
               onChange={handleChange}
               margin="normal"
-              autoComplete="current-password"
+              required
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
-                    <Lock />
+                    <Lock color="action" />
                   </InputAdornment>
                 ),
                 endAdornment: (
                   <InputAdornment position="end">
-                    <IconButton
-                      edge="end"
-                      aria-label={showPassword ? 'Hide password' : 'Show password'}
-                      onClick={() => setShowPassword((visible) => !visible)}
-                    >
+                    <IconButton onClick={() => setShowPassword(!showPassword)}>
                       {showPassword ? <VisibilityOff /> : <Visibility />}
                     </IconButton>
                   </InputAdornment>
                 ),
               }}
             />
-
             <Button
-              fullWidth
               type="submit"
+              fullWidth
               variant="contained"
+              size="large"
               disabled={loading}
-              sx={{ mt: 3, mb: 3, py: 1.5, bgcolor: '#5D4037' }}
+              sx={{ mt: 3, mb: 2 }}
             >
-              {loading ? 'Signing in…' : 'Sign in'}
+              {loading ? 'Signing in...' : 'Sign In'}
             </Button>
-          </Box>
+          </form>
 
-          <Box sx={{ mt: 2 }}>
-            <Typography variant="caption" color="text.secondary" display="block" mb={1}>
-              Demo access
+          <Divider sx={{ my: 3 }}>
+            <Typography variant="caption" color="textSecondary">
+              Demo Credentials
             </Typography>
-            {demoCredentials.map((credential) => (
-              <Button
-                key={credential.role}
-                fullWidth
-                size="small"
-                color="inherit"
-                sx={{ justifyContent: 'space-between', textTransform: 'none', mb: 0.5 }}
-                onClick={() => fillCredentials(credential.email, credential.password)}
-              >
-                <span>{credential.role}</span>
-                <span>{credential.email}</span>
-              </Button>
+          </Divider>
+
+          <Grid container spacing={1}>
+            {demoCredentials.map((cred) => (
+              <Grid item xs={6} key={cred.role}>
+                <Paper
+                  variant="outlined"
+                  sx={{
+                    p: 1,
+                    cursor: 'pointer',
+                    textAlign: 'center',
+                    '&:hover': {
+                      bgcolor: 'action.hover',
+                      borderColor: cred.color,
+                    },
+                  }}
+                  onClick={() => fillCredentials(cred.email, cred.password)}
+                >
+                  <Typography variant="caption" fontWeight="bold" display="block">
+                    {cred.role}
+                  </Typography>
+                  <Typography variant="caption" color="textSecondary" noWrap>
+                    {cred.email}
+                  </Typography>
+                </Paper>
+              </Grid>
             ))}
-          </Box>
+          </Grid>
         </CardContent>
       </Card>
     </Box>

@@ -35,12 +35,11 @@ import {
   Edit,
   Delete,
   Visibility,
-  FilterList,
   Clear,
 } from '@mui/icons-material';
-import { getCars, deleteCar, updateCar } from '../../services/carService';
+import { getCars, deleteCar } from '../../services/carService';
 import { getSuppliers } from '../../services/supplierService';
-import { formatCurrency, formatDate, getStatusColor } from '../../utils/calculations';
+import { formatCurrency, getStatusColor } from '../../utils/calculations';
 
 const Cars = () => {
   const navigate = useNavigate();
@@ -139,9 +138,19 @@ const Cars = () => {
 
   const statusOptions = ['Available', 'Reserved', 'Sold', 'Inactive'];
 
+  if (loading) return <Box>Loading...</Box>;
+
   return (
-    <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+    <Box sx={{ width: '100%' }}>
+      {/* Header */}
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center', 
+        mb: 3,
+        flexWrap: 'wrap',
+        gap: 2,
+      }}>
         <Typography variant="h4" fontWeight="bold">
           Cars Inventory
         </Typography>
@@ -154,8 +163,8 @@ const Cars = () => {
         </Button>
       </Box>
 
-      {/* Filters */}
-      <Card sx={{ mb: 3 }}>
+      {/* Filters - FULL WIDTH */}
+      <Card sx={{ mb: 3, width: '100%' }}>
         <CardContent>
           <Grid container spacing={2} alignItems="center">
             <Grid item xs={12} sm={3}>
@@ -232,20 +241,26 @@ const Cars = () => {
         </CardContent>
       </Card>
 
-      {/* Table */}
-      <Card>
-        <TableContainer component={Paper} elevation={0}>
-          <Table>
+      {/* Table - FULL WIDTH WITH HORIZONTAL SCROLL */}
+      <Card sx={{ width: '100%', overflow: 'hidden' }}>
+        <TableContainer 
+          component={Paper} 
+          elevation={0}
+          sx={{ 
+            width: '100%',
+            overflowX: 'auto',
+          }}
+        >
+          <Table sx={{ minWidth: 800 }}>
             <TableHead>
               <TableRow>
-                <TableCell>ID</TableCell>
-                <TableCell>Make / Model</TableCell>
-                <TableCell>Variant</TableCell>
-                <TableCell>Year</TableCell>
-                <TableCell>Price</TableCell>
-                <TableCell>Stock</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell align="center">Actions</TableCell>
+                <TableCell><strong>Make / Model</strong></TableCell>
+                <TableCell><strong>Variant</strong></TableCell>
+                <TableCell><strong>Year</strong></TableCell>
+                <TableCell><strong>Price</strong></TableCell>
+                <TableCell><strong>Stock</strong></TableCell>
+                <TableCell><strong>Status</strong></TableCell>
+                <TableCell align="center"><strong>Actions</strong></TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -253,7 +268,6 @@ const Cars = () => {
                 .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                 .map((car) => (
                   <TableRow key={car.id} hover>
-                    <TableCell>{car.id}</TableCell>
                     <TableCell>
                       <Typography variant="body2" fontWeight="500">
                         {car.make} {car.model}
@@ -308,7 +322,7 @@ const Cars = () => {
                 ))}
               {filteredCars.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
+                  <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
                     <Typography color="textSecondary">
                       No cars found. Add your first car!
                     </Typography>
@@ -319,7 +333,7 @@ const Cars = () => {
           </Table>
         </TableContainer>
         <TablePagination
-          rowsPerPageOptions={[5, 10, 25]}
+          rowsPerPageOptions={[5, 10, 25, 50]}
           component="div"
           count={filteredCars.length}
           rowsPerPage={rowsPerPage}

@@ -102,3 +102,64 @@ body {
     border: 1px solid #ddd !important;
   }
 }
+
+/* Global Styles */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', 'Roboto', 'Helvetica', 'Arial', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+/* Fix for MUI Drawer - Full Width Content */
+.MuiDrawer-paper {
+  overflow-x: hidden;
+}
+
+/* Table Container - Full Width */
+.MuiTableContainer-root {
+  width: 100% !important;
+}
+
+/* Card Content - No Padding Issue */
+.MuiCardContent-root {
+  width: 100% !important;
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #8D6E63;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #5D4037;
+}
+
+/* Responsive Fixes */
+@media (max-width: 600px) {
+  .MuiTableCell-root {
+    padding: 8px 4px !important;
+    font-size: 0.75rem !important;
+  }
+  
+  .MuiTablePagination-root {
+    font-size: 0.75rem !important;
+  }
+}

@@ -24,13 +24,11 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from '../../context/AuthContext';
 import { useThemeContext } from '../../context/ThemeContext';
-import { getCurrentUser } from '../../services/authService';
 
 const TopBar = ({ handleDrawerToggle, isSidebarCollapsed, handleSidebarToggle }) => {
   const theme = useTheme();
   const { darkMode, setDarkMode } = useThemeContext();
-  const { logout } = useAuth();
-  const user = getCurrentUser();
+  const { logout, user } = useAuth();
   const [anchorEl, setAnchorEl] = React.useState(null);
   const [notificationAnchor, setNotificationAnchor] = React.useState(null);
 
@@ -69,6 +67,9 @@ const TopBar = ({ handleDrawerToggle, isSidebarCollapsed, handleSidebarToggle })
         boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
         borderBottom: '1px solid',
         borderColor: theme.palette.divider,
+        left: 0,
+        right: 0,
+        top: 0,
       }}
     >
       <Toolbar>

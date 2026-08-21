@@ -8,11 +8,11 @@ import {
   ListItemIcon,
   ListItemText,
   ListItemButton,
-  Divider,
   Typography,
   Avatar,
   Tooltip,
-  Collapse,
+  useTheme,
+  useMediaQuery,
 } from '@mui/material';
 import {
   Dashboard,
@@ -24,32 +24,29 @@ import {
   BarChart,
   Settings,
   Logout,
-  ExpandLess,
-  ExpandMore,
   Storefront,
-  ShoppingCart,
-  Inventory,
   AdminPanelSettings,
-  SupervisorAccount,
 } from '@mui/icons-material';
 import { useAuth } from '../../context/AuthContext';
-import { getCurrentUser } from '../../services/authService';
-import { seedUsers } from '../../data/seedData';
 
-const Sidebar = ({ mobileOpen, handleDrawerToggle, isCollapsed, drawerWidth }) => {
+const Sidebar = ({ 
+  mobileOpen, 
+  handleDrawerToggle, 
+  isCollapsed, 
+  drawerWidth,
+  collapsedDrawerWidth 
+}) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { logout } = useAuth();
-  const user = getCurrentUser();
-  const [openMenus, setOpenMenus] = React.useState({});
+  const theme = useTheme();
+  const { logout, user } = useAuth();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   const getMenuItems = () => {
     const role = user?.role || 'customer';
     
-    const baseItems = [];
-    
     if (role === 'admin') {
-      baseItems.push(
+      return [
         { text: 'Dashboard', icon: <Dashboard />, path: '/dashboard' },
         { text: 'Cars', icon: <DirectionsCar />, path: '/cars' },
         { text: 'Suppliers', icon: <LocalShipping />, path: '/suppliers' },
@@ -58,37 +55,36 @@ const Sidebar = ({ mobileOpen, handleDrawerToggle, isCollapsed, drawerWidth }) =
         { text: 'Users', icon: <AdminPanelSettings />, path: '/users' },
         { text: 'Reports', icon: <BarChart />, path: '/reports' },
         { text: 'Settings', icon: <Settings />, path: '/settings' },
-      );
+      ];
     } else if (role === 'sales') {
-      baseItems.push(
+      return [
         { text: 'Dashboard', icon: <Dashboard />, path: '/dashboard' },
         { text: 'Cars', icon: <DirectionsCar />, path: '/cars' },
         { text: 'Customers', icon: <People />, path: '/customers' },
         { text: 'Applications', icon: <Assignment />, path: '/applications' },
         { text: 'Reports', icon: <BarChart />, path: '/reports' },
-      );
+      ];
     } else if (role === 'inventory') {
-      baseItems.push(
+      return [
         { text: 'Dashboard', icon: <Dashboard />, path: '/dashboard' },
         { text: 'Cars', icon: <DirectionsCar />, path: '/cars' },
         { text: 'Suppliers', icon: <LocalShipping />, path: '/suppliers' },
         { text: 'Reports', icon: <BarChart />, path: '/reports' },
-      );
+      ];
     } else if (role === 'customer') {
-      baseItems.push(
+      return [
         { text: 'Dashboard', icon: <Dashboard />, path: '/customer-dashboard' },
         { text: 'Showroom', icon: <Storefront />, path: '/showroom' },
         { text: 'My Applications', icon: <Assignment />, path: '/my-applications' },
         { text: 'Profile', icon: <Person />, path: '/customer-profile' },
-      );
+      ];
     }
-    
-    return baseItems;
+    return [];
   };
 
   const handleNavigation = (path) => {
     navigate(path);
-    if (mobileOpen) handleDrawerToggle();
+    if (isMobile) handleDrawerToggle();
   };
 
   const handleLogout = () => {
@@ -100,9 +96,11 @@ const Sidebar = ({ mobileOpen, handleDrawerToggle, isCollapsed, drawerWidth }) =
     return location.pathname === path;
   };
 
-  const drawer = (
+  const currentWidth = isCollapsed ? collapsedDrawerWidth : drawerWidth;
+
+  const drawerContent = (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      {/* Logo Section */}
+      {/* Logo */}
       <Box
         sx={{
           p: 2,
@@ -111,7 +109,7 @@ const Sidebar = ({ mobileOpen, handleDrawerToggle, isCollapsed, drawerWidth }) =
           justifyContent: isCollapsed ? 'center' : 'flex-start',
           borderBottom: '1px solid',
           borderColor: 'divider',
-          minHeight: '80px',
+          minHeight: 80,
         }}
       >
         <Avatar
@@ -150,7 +148,7 @@ const Sidebar = ({ mobileOpen, handleDrawerToggle, isCollapsed, drawerWidth }) =
           }}
         >
           <Avatar sx={{ bgcolor: 'secondary.main', width: 40, height: 40 }}>
-            {user.name?.charAt(0)}
+            {user.name?.charAt(0) || 'U'}
           </Avatar>
           <Box sx={{ ml: 1.5, overflow: 'hidden' }}>
             <Typography variant="subtitle2" noWrap>
@@ -163,8 +161,8 @@ const Sidebar = ({ mobileOpen, handleDrawerToggle, isCollapsed, drawerWidth }) =
         </Box>
       )}
 
-      {/* Navigation Items */}
-      <List sx={{ flex: 1, px: 1, py: 1 }}>
+      {/* Navigation */}
+      <List sx={{ flex: 1, px: 1, py: 2 }}>
         {getMenuItems().map((item) => (
           <ListItem key={item.text} disablePadding>
             <Tooltip title={isCollapsed ? item.text : ''} placement="right">
@@ -176,7 +174,7 @@ const Sidebar = ({ mobileOpen, handleDrawerToggle, isCollapsed, drawerWidth }) =
                   mb: 0.5,
                   justifyContent: isCollapsed ? 'center' : 'flex-start',
                   px: isCollapsed ? 1.5 : 2,
-                  py: 1,
+                  py: 1.5,
                   '&.Mui-selected': {
                     backgroundColor: 'primary.main',
                     color: 'white',
@@ -186,6 +184,9 @@ const Sidebar = ({ mobileOpen, handleDrawerToggle, isCollapsed, drawerWidth }) =
                     '& .MuiListItemIcon-root': {
                       color: 'white',
                     },
+                  },
+                  '&:hover': {
+                    backgroundColor: 'action.hover',
                   },
                 }}
               >
@@ -205,7 +206,7 @@ const Sidebar = ({ mobileOpen, handleDrawerToggle, isCollapsed, drawerWidth }) =
         ))}
       </List>
 
-      {/* Logout Button */}
+      {/* Logout */}
       <Box sx={{ p: 1, borderTop: '1px solid', borderColor: 'divider' }}>
         <Tooltip title={isCollapsed ? 'Logout' : ''} placement="right">
           <ListItemButton
@@ -214,7 +215,7 @@ const Sidebar = ({ mobileOpen, handleDrawerToggle, isCollapsed, drawerWidth }) =
               borderRadius: 2,
               justifyContent: isCollapsed ? 'center' : 'flex-start',
               px: isCollapsed ? 1.5 : 2,
-              py: 1,
+              py: 1.5,
               color: 'error.main',
               '&:hover': {
                 backgroundColor: 'error.light',
@@ -254,26 +255,33 @@ const Sidebar = ({ mobileOpen, handleDrawerToggle, isCollapsed, drawerWidth }) =
           },
         }}
       >
-        {drawer}
+        {drawerContent}
       </Drawer>
 
-      {/* Desktop Drawer */}
+      {/* Desktop Drawer - FIXED POSITION */}
       <Drawer
         variant="permanent"
         sx={{
           display: { xs: 'none', sm: 'block' },
+          width: currentWidth,
+          flexShrink: 0,
           '& .MuiDrawer-paper': {
-            boxSizing: 'border-box',
-            width: isCollapsed ? 80 : drawerWidth,
+            width: currentWidth,
             transition: 'width 0.3s ease',
             overflowX: 'hidden',
             borderRight: '1px solid',
             borderColor: 'divider',
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            height: '100vh',
+            zIndex: theme.zIndex.drawer,
+            backgroundColor: theme.palette.background.paper,
           },
         }}
         open
       >
-        {drawer}
+        {drawerContent}
       </Drawer>
     </>
   );
