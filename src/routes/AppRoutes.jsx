@@ -33,7 +33,8 @@ import CustomerProfilePage from '../pages/customer/CustomerProfilePage';
 // Management Pages
 import Applications from '../pages/management/Applications';
 import Customers from '../pages/management/Customers';
-import Users from '../pages/management/Users';
+// Import the Redux version - USE THIS
+import UsersRedux from '../pages/management/UsersRedux';
 
 // Reports
 import ReportsPage from '../pages/reports/ReportsPage';
@@ -72,7 +73,14 @@ const AppRoutes = () => {
         <Route path="/add-supplier" element={<RoleRoute allowedRoles={['admin', 'inventory']}><AddSupplier /></RoleRoute>} />
         <Route path="/applications" element={<RoleRoute allowedRoles={['admin', 'sales']}><Applications /></RoleRoute>} />
         <Route path="/customers" element={<RoleRoute allowedRoles={['admin', 'sales']}><Customers /></RoleRoute>} />
-        <Route path="/users" element={<RoleRoute allowedRoles={['admin']}><Users /></RoleRoute>} />
+        
+        {/* Users Route - Using Redux Version */}
+        <Route path="/users" element={
+          <RoleRoute allowedRoles={['admin']}>
+            <UsersRedux />
+          </RoleRoute>
+        } />
+        
         <Route path="/reports" element={<RoleRoute allowedRoles={['admin', 'sales', 'inventory']}><ReportsPage /></RoleRoute>} />
       </Route>
       

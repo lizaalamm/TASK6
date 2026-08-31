@@ -52,7 +52,7 @@ const Sidebar = ({
         { text: 'Suppliers', icon: <LocalShipping />, path: '/suppliers' },
         { text: 'Customers', icon: <People />, path: '/customers' },
         { text: 'Applications', icon: <Assignment />, path: '/applications' },
-        { text: 'Users', icon: <AdminPanelSettings />, path: '/users' },
+       { text: 'Users', icon: <AdminPanelSettings />, path: '/users' },
         { text: 'Reports', icon: <BarChart />, path: '/reports' },
         { text: 'Settings', icon: <Settings />, path: '/settings' },
       ];
