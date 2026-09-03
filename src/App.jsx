@@ -6,8 +6,14 @@ import { AuthProvider } from './context/AuthContext';
 import { ThemeContextProvider } from './context/ThemeContext';
 import AppRoutes from './routes/AppRoutes';
 import { brownTheme, darkBrownTheme } from './assets/theme/brownTheme';
+import { seedData } from './data/seedData';
+import { seedInitialData } from './services/localStorage';
 
 function App() {
+  React.useEffect(() => {
+    seedInitialData(seedData);
+  }, []);
+
   const [darkMode, setDarkMode] = React.useState(false);
 
   const theme = React.useMemo(

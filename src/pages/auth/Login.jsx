@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Box,
   Card,
@@ -23,13 +23,18 @@ import {
   CarRental,
 } from '@mui/icons-material';
 import { useAuth } from '../../context/AuthContext';
-import { loginUser } from '../../services/authService';
 import { seedData } from '../../data/seedData';
-import { seedInitialData, getData } from '../../services/localStorage';
+import { seedInitialData } from '../../services/localStorage';
+
+const getRedirectPath = (user) => {
+  const role = user?.role || user?.userType;
+  if (role === 'customer') return '/customer-dashboard';
+  return '/dashboard';
+};
 
 const Login = () => {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, isAuthenticated, user } = useAuth();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -39,20 +44,18 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // Seed initial data on first load
-    console.log('Checking and seeding data...');
-    const seeded = seedInitialData(seedData);
-    if (seeded) {
-      console.log('Data seeded successfully!');
-      // Verify data was seeded
-      const cars = getData('udevs_cars', []);
-      console.log('Cars in localStorage:', cars.length);
-    }
+    seedInitialData(seedData);
   }, []);
+
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      navigate(getRedirectPath(user), { replace: true });
+    }
+  }, [isAuthenticated, user, navigate]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
     setError('');
   };
 
@@ -62,23 +65,14 @@ const Login = () => {
     setLoading(true);
 
     try {
-      const result = loginUser(formData.email, formData.password);
-      
+      const result = await login(formData.email, formData.password);
       if (result.success) {
-        login(result.user);
-        // Redirect based on role
-        if (result.user.role === 'admin') {
-          navigate('/dashboard');
-        } else if (result.user.role === 'sales' || result.user.role === 'inventory') {
-          navigate('/dashboard');
-        } else if (result.user.role === 'customer') {
-          navigate('/customer-dashboard');
-        }
+        navigate(getRedirectPath(result.user), { replace: true });
       } else {
         setError(result.message || 'Login failed');
       }
     } catch (err) {
-      setError('An error occurred during login');
+      setError(err.response?.data?.message || 'Unable to reach the API. Is the backend running?');
     } finally {
       setLoading(false);
     }
@@ -133,7 +127,7 @@ const Login = () => {
               Car Showroom
             </Typography>
             <Typography variant="body2" color="textSecondary">
-              Sign in to your account
+              Sign in with the live API
             </Typography>
           </Box>
 
@@ -196,6 +190,13 @@ const Login = () => {
               {loading ? 'Signing in...' : 'Sign In'}
             </Button>
           </form>
+
+          <Typography variant="body2" align="center" sx={{ mb: 1 }}>
+            New here?{' '}
+            <Link to="/register" style={{ color: '#5D4037', fontWeight: 600 }}>
+              Create an account
+            </Link>
+          </Typography>
 
           <Divider sx={{ my: 3 }}>
             <Typography variant="caption" color="textSecondary">

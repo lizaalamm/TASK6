@@ -134,7 +134,7 @@ const UsersRedux = () => {
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Box>
                   <Typography variant="caption" color="textSecondary">Active Users</Typography>
-                  <Typography variant="h4">{users.filter(u => u.status === 'Active').length}</Typography>
+                  <Typography variant="h4">{users.filter(u => String(u.status || '').toLowerCase() === 'active').length}</Typography>
                 </Box>
                 <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'success.light', color: 'white' }}>
                   Active
@@ -149,7 +149,7 @@ const UsersRedux = () => {
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Box>
                   <Typography variant="caption" color="textSecondary">Admins</Typography>
-                  <Typography variant="h4">{users.filter(u => u.role === 'Admin').length}</Typography>
+                  <Typography variant="h4">{users.filter(u => (u.role || u.userType) === 'admin').length}</Typography>
                 </Box>
                 <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'warning.light', color: 'white' }}>
                   Admin

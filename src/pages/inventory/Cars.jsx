@@ -294,7 +294,7 @@ const Cars = () => {
                       <Tooltip title="View">
                         <IconButton
                           size="small"
-                          onClick={() => navigate(`/car/${car.id}`)}
+                          onClick={() => navigate(`/cars/${car.id}`)}
                         >
                           <Visibility />
                         </IconButton>

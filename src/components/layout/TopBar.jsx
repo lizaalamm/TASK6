@@ -115,7 +115,7 @@ const TopBar = ({ handleDrawerToggle, isSidebarCollapsed, handleSidebarToggle })
           {/* User Menu */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Chip
-              label={user?.role?.charAt(0).toUpperCase() + user?.role?.slice(1)}
+              label={(user?.role || user?.userType || 'user').charAt(0).toUpperCase() + (user?.role || user?.userType || 'user').slice(1)}
               size="small"
               color="primary"
               variant="outlined"

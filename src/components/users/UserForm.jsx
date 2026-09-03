@@ -12,16 +12,25 @@ import {
   Select,
   Grid,
   Alert,
-  Box,
 } from '@mui/material';
+
+const ROLES = [
+  { value: 'admin', label: 'Admin' },
+  { value: 'employee', label: 'Employee' },
+  { value: 'teamlead', label: 'Team Lead' },
+  { value: 'sales', label: 'Sales' },
+  { value: 'inventory', label: 'Inventory' },
+  { value: 'customer', label: 'Customer' },
+];
 
 const UserForm = ({ open, onClose, onSubmit, user, loading, error }) => {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
-    role: 'User',
-    status: 'Active',
+    phone: '',
+    userType: 'employee',
+    status: 'active',
   });
   const [formErrors, setFormErrors] = useState({});
 
@@ -31,16 +40,18 @@ const UserForm = ({ open, onClose, onSubmit, user, loading, error }) => {
         name: user.name || '',
         email: user.email || '',
         password: '',
-        role: user.role || 'User',
-        status: user.status || 'Active',
+        phone: user.phone || '',
+        userType: user.userType || user.role || 'employee',
+        status: (user.status || 'active').toLowerCase(),
       });
     } else {
       setFormData({
         name: '',
         email: '',
         password: '',
-        role: 'User',
-        status: 'Active',
+        phone: '',
+        userType: 'employee',
+        status: 'active',
       });
     }
     setFormErrors({});
@@ -60,9 +71,8 @@ const UserForm = ({ open, onClose, onSubmit, user, loading, error }) => {
     if (!formData.email.trim()) errors.email = 'Email is required';
     else if (!/\S+@\S+\.\S+/.test(formData.email)) errors.email = 'Invalid email format';
     if (!user && !formData.password) errors.password = 'Password is required for new user';
-    else if (!user && formData.password.length < 6) errors.password = 'Password must be at least 6 characters';
-    if (!formData.role) errors.role = 'Role is required';
-
+    else if (!user && formData.password.length < 8) errors.password = 'Password must be at least 8 characters';
+    if (!formData.userType) errors.userType = 'Role is required';
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -71,19 +81,21 @@ const UserForm = ({ open, onClose, onSubmit, user, loading, error }) => {
     e.preventDefault();
     if (!validateForm()) return;
 
-    const submitData = { ...formData };
-    if (!submitData.password) delete submitData.password;
+    const submitData = {
+      name: formData.name,
+      email: formData.email,
+      userType: formData.userType,
+      role: formData.userType,
+      status: formData.status,
+    };
+    if (formData.phone) submitData.phone = formData.phone.replace(/\s+/g, '');
+    if (formData.password) submitData.password = formData.password;
     onSubmit(submitData);
   };
 
-  const roles = ['Admin', 'Manager', 'TeamLead', 'User', 'Customer'];
-  const statuses = ['Active', 'Inactive'];
-
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>
-        {user ? 'Edit User' : 'Add New User'}
-      </DialogTitle>
+      <DialogTitle>{user ? 'Edit User' : 'Add New User'}</DialogTitle>
       <form onSubmit={handleSubmit}>
         <DialogContent>
           {error && (
@@ -117,6 +129,17 @@ const UserForm = ({ open, onClose, onSubmit, user, loading, error }) => {
                 required
               />
             </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Phone"
+                name="phone"
+                value={formData.phone}
+                onChange={handleChange}
+                placeholder="03001234567"
+                helperText="Format: 03XXXXXXXXX or +92XXXXXXXXXX"
+              />
+            </Grid>
             {!user && (
               <Grid item xs={12}>
                 <TextField
@@ -127,22 +150,24 @@ const UserForm = ({ open, onClose, onSubmit, user, loading, error }) => {
                   value={formData.password}
                   onChange={handleChange}
                   error={!!formErrors.password}
-                  helperText={formErrors.password || 'Minimum 6 characters'}
+                  helperText={formErrors.password || 'Minimum 8 characters'}
                   required
                 />
               </Grid>
             )}
             <Grid item xs={12} sm={6}>
-              <FormControl fullWidth error={!!formErrors.role}>
+              <FormControl fullWidth error={!!formErrors.userType}>
                 <InputLabel>Role</InputLabel>
                 <Select
-                  name="role"
-                  value={formData.role}
+                  name="userType"
+                  value={formData.userType}
                   onChange={handleChange}
                   label="Role"
                 >
-                  {roles.map((role) => (
-                    <MenuItem key={role} value={role}>{role}</MenuItem>
+                  {ROLES.map((role) => (
+                    <MenuItem key={role.value} value={role.value}>
+                      {role.label}
+                    </MenuItem>
                   ))}
                 </Select>
               </FormControl>
@@ -156,9 +181,8 @@ const UserForm = ({ open, onClose, onSubmit, user, loading, error }) => {
                   onChange={handleChange}
                   label="Status"
                 >
-                  {statuses.map((status) => (
-                    <MenuItem key={status} value={status}>{status}</MenuItem>
-                  ))}
+                  <MenuItem value="active">Active</MenuItem>
+                  <MenuItem value="inactive">Inactive</MenuItem>
                 </Select>
               </FormControl>
             </Grid>

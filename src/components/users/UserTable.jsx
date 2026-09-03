@@ -76,7 +76,7 @@ const UserTable = ({ users, loading, onEdit, onDelete, onView }) => {
               <TableCell>{user.email}</TableCell>
               <TableCell>
                 <Chip
-                  label={user.role || 'User'}
+                  label={user.role || user.userType || 'User'}
                   size="small"
                   color={getRoleColor(user.role)}
                   variant="outlined"
@@ -84,9 +84,9 @@ const UserTable = ({ users, loading, onEdit, onDelete, onView }) => {
               </TableCell>
               <TableCell>
                 <Chip
-                  label={user.status || 'Active'}
+                  label={user.status || 'active'}
                   size="small"
-                  color={user.status === 'Active' ? 'success' : 'default'}
+                  color={String(user.status || '').toLowerCase() === 'active' ? 'success' : 'default'}
                 />
               </TableCell>
               <TableCell align="center">

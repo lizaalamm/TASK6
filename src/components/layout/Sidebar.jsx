@@ -43,7 +43,7 @@ const Sidebar = ({
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   const getMenuItems = () => {
-    const role = user?.role || 'customer';
+    const role = user?.role || user?.userType || 'customer';
     
     if (role === 'admin') {
       return [
@@ -56,7 +56,7 @@ const Sidebar = ({
         { text: 'Reports', icon: <BarChart />, path: '/reports' },
         { text: 'Settings', icon: <Settings />, path: '/settings' },
       ];
-    } else if (role === 'sales') {
+    } else if (role === 'sales' || role === 'employee' || role === 'teamlead') {
       return [
         { text: 'Dashboard', icon: <Dashboard />, path: '/dashboard' },
         { text: 'Cars', icon: <DirectionsCar />, path: '/cars' },
