@@ -1,3 +1,15 @@
+/**
+ * src/components/users/UserForm.jsx
+ * ----------------------------------------------------------------------------
+ * Create / edit user dialog used by the Users screen.
+ *
+ * Props:
+ *  - `user`            → object when editing, null when creating
+ *  - `currentUserRole` → role of the logged-in staff member; the
+ *                        "Super Admin" option is ONLY offered to superadmins
+ *                        (the API enforces the same rule server-side).
+ * ----------------------------------------------------------------------------
+ */
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -12,51 +24,62 @@ import {
   Select,
   Grid,
   Alert,
+  Avatar,
+  Box,
+  Typography,
 } from '@mui/material';
+import { PersonAdd, Edit } from '@mui/icons-material';
+import { ROLES, ROLE_LABELS } from '../../constants/roles';
 
-const ROLES = [
-  { value: 'admin', label: 'Admin' },
-  { value: 'employee', label: 'Employee' },
-  { value: 'teamlead', label: 'Team Lead' },
-  { value: 'sales', label: 'Sales' },
-  { value: 'inventory', label: 'Inventory' },
-  { value: 'customer', label: 'Customer' },
+/** All assignable roles in privilege order (highest first). */
+const ALL_ROLE_VALUES = [
+  ROLES.SUPERADMIN,
+  ROLES.ADMIN,
+  ROLES.TEAMLEAD,
+  ROLES.SALES,
+  ROLES.INVENTORY,
+  ROLES.EMPLOYEE,
+  ROLES.CUSTOMER,
 ];
 
-const UserForm = ({ open, onClose, onSubmit, user, loading, error }) => {
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: '',
-    phone: '',
-    userType: 'employee',
-    status: 'active',
-  });
+/** Empty-form defaults for the "create" mode. */
+const EMPTY_FORM = {
+  name: '',
+  email: '',
+  password: '',
+  phone: '',
+  userType: 'employee',
+  status: 'active',
+};
+
+const UserForm = ({ open, onClose, onSubmit, user, loading, error, currentUserRole }) => {
+  const [formData, setFormData] = useState(EMPTY_FORM);
   const [formErrors, setFormErrors] = useState({});
 
+  // Only superadmins may assign the superadmin role — hide it for admins.
+  const isSuperAdmin = String(currentUserRole || '').toLowerCase() === ROLES.SUPERADMIN;
+  const visibleRoles = ALL_ROLE_VALUES.filter(
+    (value) => value !== ROLES.SUPERADMIN || isSuperAdmin
+  );
+
+  // Prefill when editing; reset when creating (or when the dialog reopens).
   useEffect(() => {
     if (user) {
       setFormData({
         name: user.name || '',
         email: user.email || '',
-        password: '',
+        password: '', // never prefill — blank means "keep existing"
         phone: user.phone || '',
         userType: user.userType || user.role || 'employee',
         status: (user.status || 'active').toLowerCase(),
       });
     } else {
-      setFormData({
-        name: '',
-        email: '',
-        password: '',
-        phone: '',
-        userType: 'employee',
-        status: 'active',
-      });
+      setFormData(EMPTY_FORM);
     }
     setFormErrors({});
   }, [user, open]);
 
+  /** Update one field + clear its error as the user types. */
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -65,6 +88,7 @@ const UserForm = ({ open, onClose, onSubmit, user, loading, error }) => {
     }
   };
 
+  /** Client-side validation (the API re-validates everything server-side). */
   const validateForm = () => {
     const errors = {};
     if (!formData.name.trim()) errors.name = 'Name is required';
@@ -77,6 +101,7 @@ const UserForm = ({ open, onClose, onSubmit, user, loading, error }) => {
     return Object.keys(errors).length === 0;
   };
 
+  /** Validate → build the API payload → bubble up to the parent. */
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!validateForm()) return;
@@ -85,7 +110,7 @@ const UserForm = ({ open, onClose, onSubmit, user, loading, error }) => {
       name: formData.name,
       email: formData.email,
       userType: formData.userType,
-      role: formData.userType,
+      role: formData.userType, // backend accepts either key
       status: formData.status,
     };
     if (formData.phone) submitData.phone = formData.phone.replace(/\s+/g, '');
@@ -95,7 +120,29 @@ const UserForm = ({ open, onClose, onSubmit, user, loading, error }) => {
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>{user ? 'Edit User' : 'Add New User'}</DialogTitle>
+      {/* Dialog header with mode icon */}
+      <DialogTitle>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <Avatar
+            sx={{
+              background: user
+                ? 'linear-gradient(135deg, #1565C0, #64B5F6)'
+                : 'linear-gradient(135deg, #5D4037, #D4A24C)',
+            }}
+          >
+            {user ? <Edit /> : <PersonAdd />}
+          </Avatar>
+          <Box>
+            <Typography variant="h6" fontWeight={700}>
+              {user ? 'Edit User' : 'Add New User'}
+            </Typography>
+            <Typography variant="caption" color="textSecondary">
+              {user ? `Updating ${user.name}` : 'Create a showroom account'}
+            </Typography>
+          </Box>
+        </Box>
+      </DialogTitle>
+
       <form onSubmit={handleSubmit}>
         <DialogContent>
           {error && (
@@ -140,6 +187,7 @@ const UserForm = ({ open, onClose, onSubmit, user, loading, error }) => {
                 helperText="Format: 03XXXXXXXXX or +92XXXXXXXXXX"
               />
             </Grid>
+            {/* Password only on create — edits keep the old hash when blank. */}
             {!user && (
               <Grid item xs={12}>
                 <TextField
@@ -164,9 +212,9 @@ const UserForm = ({ open, onClose, onSubmit, user, loading, error }) => {
                   onChange={handleChange}
                   label="Role"
                 >
-                  {ROLES.map((role) => (
-                    <MenuItem key={role.value} value={role.value}>
-                      {role.label}
+                  {visibleRoles.map((value) => (
+                    <MenuItem key={value} value={value}>
+                      {ROLE_LABELS[value] || value}
                     </MenuItem>
                   ))}
                 </Select>
@@ -188,7 +236,7 @@ const UserForm = ({ open, onClose, onSubmit, user, loading, error }) => {
             </Grid>
           </Grid>
         </DialogContent>
-        <DialogActions>
+        <DialogActions sx={{ px: 3, pb: 2.5 }}>
           <Button onClick={onClose} disabled={loading}>
             Cancel
           </Button>

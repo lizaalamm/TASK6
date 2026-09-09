@@ -1,5 +1,18 @@
+/**
+ * src/services/api.js
+ * ----------------------------------------------------------------------------
+ * Shared Axios instance for ALL backend calls.
+ *
+ *  - Base URL comes from `VITE_API_URL` (`/api` in dev → Vite proxies it to
+ *    the Express server, so the browser never touches :5000 directly).
+ *  - Request interceptor injects `Authorization: Bearer <jwt>` from storage.
+ *  - Response interceptor clears the session + bounces to /login on 401s
+ *    (except on login/register themselves, where 401 just means bad input).
+ * ----------------------------------------------------------------------------
+ */
 import axios from 'axios';
 
+// `/api` by default — override per-environment with VITE_API_URL.
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 const api = axios.create({
@@ -7,9 +20,10 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  withCredentials: true,
+  withCredentials: true, // send the httpOnly JWT cookie alongside the header
 });
 
+// Attach the stored JWT to every outgoing request.
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
@@ -21,6 +35,7 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+// Global 401 handling: expired/invalid session → wipe + redirect to login.
 api.interceptors.response.use(
   (response) => response,
   (error) => {

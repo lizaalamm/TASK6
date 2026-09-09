@@ -1,6 +1,15 @@
+/**
+ * backend/src/config/env.js
+ * ----------------------------------------------------------------------------
+ * Typed environment access: loads `backend/.env`, FAILS FAST when a required
+ * variable is missing, and exposes everything else with sane defaults.
+ * Import this — never `process.env` directly — anywhere in the backend.
+ * ----------------------------------------------------------------------------
+ */
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '../../.env') });
 
+// The server refuses to boot without these (loud failure > silent misconfig).
 const required = ['JWT_SECRET'];
 
 required.forEach((key) => {
@@ -14,7 +23,7 @@ module.exports = {
   nodeEnv: process.env.NODE_ENV || 'development',
   isDev: (process.env.NODE_ENV || 'development') === 'development',
   db: {
-    dialect: process.env.DB_DIALECT || 'postgres',
+    dialect: process.env.DB_DIALECT || 'postgres', // 'postgres' | 'sqlite'
     name: process.env.DB_NAME,
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,

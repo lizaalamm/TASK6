@@ -12,46 +12,53 @@ React UI → Redux Toolkit → Axios → Express Route → Middleware → Contro
 TASK6/
 ├── backend/
 │   ├── src/
-│   │   ├── config/
-│   │   │   ├── db.js
-│   │   │   └── env.js
-│   │   ├── controllers/
-│   │   │   └── userController.js
-│   │   ├── models/
-│   │   │   ├── userModel.js
-│   │   │   └── index.js
-│   │   ├── routes/
-│   │   │   └── userRoutes.js
-│   │   ├── middleware/
-│   │   │   ├── authMiddleware.js
-│   │   │   ├── errorMiddleware.js
-│   │   │   └── validateMiddleware.js
-│   │   ├── validators/
-│   │   │   └── userValidators.js
-│   │   ├── services/
-│   │   │   └── tokenService.js
-│   │   ├── utils/
-│   │   │   ├── apiResponse.js
-│   │   │   └── sanitizeUser.js
-│   │   ├── seeders/
-│   │   │   └── seedUsers.js
-│   │   ├── app.js
-│   │   └── server.js
-│   ├── .env
-│   ├── .env.example
+│   │   ├── config/           # env.js (typed env) · db.js (Sequelize instance)
+│   │   ├── constants/        # roles.js — role hierarchy + canManageRole()
+│   │   ├── controllers/      # userController.js · adminController.js (superadmin stats)
+│   │   ├── models/           # userModel.js · index.js (relations + PG ENUM safety)
+│   │   ├── routes/           # userRoutes.js (/api/users) · adminRoutes.js (/api/admin)
+│   │   ├── middleware/       # auth (isAuthenticated/requireAdmin/requireSuperAdmin/requireRoles)
+│   │   ├── validators/       # express-validator chains per endpoint
+│   │   ├── services/         # tokenService.js (JWT + cookie)
+│   │   ├── utils/            # apiResponse.js (envelope) · sanitizeUser.js
+│   │   ├── seeders/          # seedUsers.js — 6 demo accounts (idempotent)
+│   │   ├── app.js            # Express pipeline (no listen() — test-friendly)
+│   │   └── server.js         # Boot: connect → sync → seed → listen
+│   ├── .env / .env.example
 │   └── package.json
 ├── src/                      # React frontend
-│   ├── app/store.js
-│   ├── redux/auth/authSlice.js
-│   ├── redux/users/
-│   ├── services/api.js
-│   ├── services/authService.js
-│   ├── pages/auth/Login.jsx
-│   ├── pages/auth/Register.jsx
-│   └── ...
+│   ├── app/store.js          # Redux store (auth + users slices)
+│   ├── assets/theme/         # brownTheme.js — espresso & gold design system
+│   ├── components/           # layout/ · users/ · dashboard/ · customers/
+│   ├── constants/            # roles.js — role groups + helpers (single source of truth)
+│   ├── context/              # AuthContext.jsx · ThemeContext.jsx
+│   ├── data/                 # seedData.js — local demo catalogue
+│   ├── hooks/                # useRole.js — role flags for any component
+│   ├── pages/                # auth/ · admin/ · superadmin/ · staff/ · customer/
+│   │                         # inventory/ · management/ · reports/
+│   ├── redux/auth/           # authSlice.js — session thunks + selectors
+│   ├── redux/users/          # userSlice.js + userActions.js — user CRUD state
+│   ├── routes/               # AppRoutes.jsx · PrivateRoute.jsx · RoleRoute.jsx
+│   ├── services/             # api.js (Axios) · authService.js · userApi.js · …
+│   ├── styles/global.css     # ambient gradients, animations, glass utilities
+│   └── utils/                # calculations.js · validation.js
 ├── package.json
 └── vite.config.js            # proxies /api → :5000
 ```
+
+## Roles & permissions
+
+| Role | Home page | Powers |
+|------|-----------|--------|
+| Superadmin | `/superadmin` | Platform owner. Passes every guard, manages admins, sees system stats (`/api/admin/*`). |
+| Admin | `/dashboard` | Manages staff + customers + users, but **cannot** touch superadmin accounts or mint admins. |
+| Team lead | `/dashboard` | Sales screens + own team members. |
+| Sales / Employee | `/dashboard` | Customers + applications + reports. |
+| Inventory | `/dashboard` | Cars + suppliers + reports. |
+| Customer | `/customer-dashboard` | Showroom + own applications + profile. |
+
+Rule of thumb enforced on **both** API and UI: you can only manage roles
+strictly below your own — except superadmin, who manages everyone.
 
 ## 1. Backend
 
@@ -127,6 +134,8 @@ VITE_API_URL=/api
 | PUT | `/api/users/user` | Yes | Update (id in body) |
 | PUT | `/api/users/user/:id` | Yes | Update |
 | DELETE | `/api/users/user/:id` | Admin | Delete |
+| GET | `/api/admin/stats` | Superadmin | Platform counts + role breakdown + recent signups |
+| GET | `/api/admin/admins` | Superadmin | Leadership accounts (superadmin + admin) |
 
 ### Login request
 

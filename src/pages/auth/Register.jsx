@@ -1,3 +1,12 @@
+/**
+ * src/pages/auth/Register.jsx
+ * ----------------------------------------------------------------------------
+ * Sign-up screen: creates an account via POST /api/users/register, then
+ * redirects to the role home page. Leadership roles (admin/superadmin) are
+ * NOT offered here — the API also force-downgrades them to `customer` as a
+ * safety net, so privileged accounts can only be minted by staff.
+ * ----------------------------------------------------------------------------
+ */
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
@@ -11,15 +20,26 @@ import {
   Alert,
   InputAdornment,
   MenuItem,
+  CircularProgress,
 } from '@mui/material';
-import { Email, Lock, Person, CarRental, Phone } from '@mui/icons-material';
+import { Email, Lock, Person, DirectionsCar, Phone } from '@mui/icons-material';
 import { useAuth } from '../../context/AuthContext';
+import { homeRouteFor } from '../../constants/roles';
 import { seedData } from '../../data/seedData';
 import { seedInitialData } from '../../services/localStorage';
+
+/** Account types a visitor may self-select (no leadership roles). */
+const ACCOUNT_TYPES = [
+  { value: 'customer', label: 'Customer — browse + apply for cars' },
+  { value: 'employee', label: 'Employee — showroom staff' },
+  { value: 'sales', label: 'Sales — customer applications' },
+];
 
 const Register = () => {
   const navigate = useNavigate();
   const { register } = useAuth();
+
+  // --- Form state ----------------------------------------------------------------
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -30,27 +50,29 @@ const Register = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // Seed the local demo catalogue once (cars / customers / applications).
   React.useEffect(() => {
     seedInitialData(seedData);
   }, []);
 
+  /** Update a field + clear any previous error. */
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
     setError('');
   };
 
+  /** Create the account → redirect to the role home page. */
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
       const payload = { ...formData };
-      if (!payload.phone) delete payload.phone;
+      if (!payload.phone) delete payload.phone; // backend treats missing as null
       const result = await register(payload);
       if (result.success) {
-        const role = result.user?.role || result.user?.userType;
-        navigate(role === 'customer' ? '/customer-dashboard' : '/dashboard', { replace: true });
+        navigate(homeRouteFor(result.user), { replace: true });
       } else {
         setError(result.message || 'Registration failed');
       }
@@ -68,30 +90,66 @@ const Register = () => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'linear-gradient(135deg, #5D4037 0%, #8D6E63 100%)',
+        // Animated espresso → gold → plum showroom backdrop (matches Login).
+        background: 'linear-gradient(-45deg, #2A1B14, #5D4037, #7B1FA2, #B07C24)',
+        backgroundSize: '400% 400%',
+        animation: 'gradientPan 14s ease infinite',
         p: 2,
+        position: 'relative',
+        overflow: 'hidden',
       }}
     >
-      <Card sx={{ maxWidth: 440, width: '100%', p: 3, borderRadius: 4 }}>
+      {/* Floating ambient light blobs */}
+      <Box className="blob" sx={{ width: 420, height: 420, background: '#D4A24C', top: -120, right: -120 }} />
+      <Box className="blob" sx={{ width: 360, height: 360, background: '#7B1FA2', bottom: -100, left: -80, animationDelay: '2s' }} />
+
+      {/* Glass sign-up card */}
+      <Card
+        className="page-enter"
+        sx={{
+          maxWidth: 460,
+          width: '100%',
+          p: 3,
+          borderRadius: 6,
+          position: 'relative',
+          zIndex: 1,
+          background: 'rgba(255,255,255,.92)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          boxShadow: '0 30px 80px rgba(0,0,0,.45)',
+          border: '1px solid rgba(255,255,255,.6)',
+        }}
+      >
         <CardContent>
+          {/* Brand header */}
           <Box sx={{ textAlign: 'center', mb: 3 }}>
-            <Avatar sx={{ width: 72, height: 72, bgcolor: 'primary.main', margin: '0 auto', mb: 2 }}>
-              <CarRental sx={{ fontSize: 40 }} />
+            <Avatar
+              sx={{
+                width: 76,
+                height: 76,
+                margin: '0 auto',
+                mb: 2,
+                background: 'linear-gradient(135deg, #5D4037 0%, #D4A24C 100%)',
+                boxShadow: '0 14px 34px rgba(93,64,55,.4)',
+              }}
+            >
+              <DirectionsCar sx={{ fontSize: 42 }} />
             </Avatar>
-            <Typography variant="h5" fontWeight="bold">
+            <Typography variant="h5" fontWeight={800}>
               Create account
             </Typography>
             <Typography variant="body2" color="textSecondary">
-              Register through POST /api/users/register
+              Join the showroom in seconds
             </Typography>
           </Box>
 
           {error && (
-            <Alert severity="error" sx={{ mb: 2 }}>
+            <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
               {error}
             </Alert>
           )}
 
+          {/* Registration form */}
           <form onSubmit={handleSubmit}>
             <TextField
               fullWidth
@@ -169,18 +227,27 @@ const Register = () => {
               onChange={handleChange}
               margin="normal"
             >
-              <MenuItem value="customer">Customer</MenuItem>
-              <MenuItem value="employee">Employee</MenuItem>
-              <MenuItem value="sales">Sales</MenuItem>
+              {ACCOUNT_TYPES.map((type) => (
+                <MenuItem key={type.value} value={type.value}>
+                  {type.label}
+                </MenuItem>
+              ))}
             </TextField>
-            <Button type="submit" fullWidth variant="contained" size="large" disabled={loading} sx={{ mt: 3, mb: 2 }}>
-              {loading ? 'Creating account...' : 'Register'}
+            <Button
+              type="submit"
+              fullWidth
+              variant="contained"
+              size="large"
+              disabled={loading}
+              sx={{ mt: 3, mb: 2, py: 1.4, borderRadius: 3, fontSize: 16 }}
+            >
+              {loading ? <CircularProgress size={24} color="inherit" /> : 'Register'}
             </Button>
           </form>
 
           <Typography variant="body2" align="center">
             Already have an account?{' '}
-            <Link to="/login" style={{ color: '#5D4037', fontWeight: 600 }}>
+            <Link to="/login" style={{ color: '#8D5A1E', fontWeight: 700, textDecoration: 'none' }}>
               Sign in
             </Link>
           </Typography>

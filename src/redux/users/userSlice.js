@@ -1,3 +1,11 @@
+/**
+ * src/redux/users/userSlice.js
+ * ----------------------------------------------------------------------------
+ * Users slice — owns the user-management list state (rows, selection,
+ * loading/error/success flags). Async work lives in `userActions.js` thunks;
+ * this file only reduces their pending/fulfilled/rejected outcomes.
+ * ----------------------------------------------------------------------------
+ */
 import { createSlice } from '@reduxjs/toolkit';
 import {
   fetchUsers,

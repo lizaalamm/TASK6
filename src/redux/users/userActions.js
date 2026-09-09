@@ -1,3 +1,12 @@
+/**
+ * src/redux/users/userActions.js
+ * ----------------------------------------------------------------------------
+ * User-management thunks — one per API call, each resolving with the payload
+ * the `users` slice stores, or rejecting with a human-readable message:
+ * `fetchUsers` · `fetchUserById` · `createUser` · `updateUser` ·
+ * `deleteUser` · `fetchTeamUsers`.
+ * ----------------------------------------------------------------------------
+ */
 import { createAsyncThunk } from '@reduxjs/toolkit';
 import {
   getUsersApi,

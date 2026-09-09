@@ -1,3 +1,15 @@
+/**
+ * src/redux/auth/authSlice.js
+ * ----------------------------------------------------------------------------
+ * Auth slice — owns the login session (user + JWT + flags).
+ *
+ * Thunks: `loginUser` · `registerUser` · `logoutUser` · `loadCurrentUser`
+ * (session restore from the stored token via GET /users/me).
+ *
+ * Selectors at the bottom (`selectAuthUser`, `selectIsAuthenticated`, …) are
+ * the ONLY way components should read this slice — see AuthContext.
+ * ----------------------------------------------------------------------------
+ */
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import api from '../../services/api';
 import { persistSession, clearSession, unwrapAuth } from '../../services/authService';

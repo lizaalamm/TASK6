@@ -1,6 +1,37 @@
+/**
+ * backend/src/seeders/seedUsers.js
+ * ----------------------------------------------------------------------------
+ * Demo accounts inserted automatically on server boot (and runnable manually).
+ *
+ *  - Runs on EVERY boot but skips emails that already exist (idempotent).
+ *  - Passwords below are plain text ONLY here — the User model hashes them
+ *    via its `beforeCreate` hook before they ever reach the database.
+ *  - Manual run:  `node src/seeders/seedUsers.js`  (from `backend/`)
+ *
+ * Demo logins:
+ *  | Role       | Email               | Password      |
+ *  |------------|---------------------|---------------|
+ *  | Superadmin | superadmin@udevs.com| Super@123     |
+ *  | Admin      | admin@udevs.com     | Admin@123     |
+ *  | Sales      | sales@udevs.com     | Sales@123     |
+ *  | Inventory  | inventory@udevs.com | Inventory@123 |
+ *  | Customer   | customer@udevs.com  | Customer@123  |
+ *  | Team lead  | lead@udevs.com      | Lead@1234     |
+ * ----------------------------------------------------------------------------
+ */
 const { User } = require('../models');
 
+// The demo roster — one account per role so every dashboard is testable.
 const demoUsers = [
+  {
+    name: 'Super Admin',
+    email: 'superadmin@udevs.com',
+    password: 'Super@123',
+    userType: 'superadmin', // platform owner — manages admins too
+    phone: '03210000000',
+    cnic: '11111-1111111-1',
+    status: 'active',
+  },
   {
     name: 'Admin User',
     email: 'admin@udevs.com',
@@ -49,6 +80,10 @@ const demoUsers = [
   },
 ];
 
+/**
+ * Insert any missing demo users. Existing emails are left untouched so
+ * re-running the seeder never duplicates rows or resets passwords.
+ */
 const seedUsers = async () => {
   for (const item of demoUsers) {
     const exists = await User.findOne({ where: { email: item.email } });
@@ -59,6 +94,7 @@ const seedUsers = async () => {
   }
 };
 
+// Allow `node src/seeders/seedUsers.js` for a standalone seed run.
 if (require.main === module) {
   const { sequelize, initModels } = require('../models');
   (async () => {
