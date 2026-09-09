@@ -1,3 +1,12 @@
+/**
+ * src/pages/management/Customers.jsx
+ * ----------------------------------------------------------------------------
+ * Customer records (route: `/customers`).
+ * Scoping (spec §2): superadmin/admin/staff see all customers; managers see
+ * ONLY customers assigned to them (managerId match — enforced by the API,
+ * re-checked here before render).
+ * ----------------------------------------------------------------------------
+ */
 import React, { useState, useEffect } from 'react';
 import {
   Box,
@@ -16,88 +25,108 @@ import {
   Chip,
   Avatar,
   IconButton,
-  Tooltip,
   useTheme,
+  Alert,
+  LinearProgress,
 } from '@mui/material';
-import { Search, Visibility, Clear } from '@mui/icons-material';
-import { getCustomers } from '../../services/customerService';
+import { Search, Clear } from '@mui/icons-material';
+import { useAuth } from '../../context/AuthContext';
+import { getUserRole, ROLES } from '../../constants/roles';
+import api from '../../services/api';
+import { getData } from '../../services/localStorage';
 import { getApplicationsByCustomer } from '../../services/applicationService';
 
 const Customers = () => {
   const theme = useTheme();
+  const { user } = useAuth();
   const [customers, setCustomers] = useState([]);
-  const [filteredCustomers, setFilteredCustomers] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [loading, setLoading] = useState(true);
 
+  const role = getUserRole(user);
+  const isManager = role === ROLES.MANAGER;
+
   useEffect(() => {
     loadData();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
-  const loadData = () => {
-    const customerData = getCustomers();
-    setCustomers(customerData);
-    setFilteredCustomers(customerData);
+  const loadData = async () => {
+    setLoading(true);
+    let rows = [];
+    try {
+      const res = await api.get('/users/user', { params: { userType: 'customer' } });
+      rows = res.data?.data || [];
+    } catch {
+      rows = getData('udevs_customers', []);
+    }
+    // Client-side re-scope (the API already scopes; never render foreign rows).
+    if (isManager) {
+      rows = rows.filter((c) => String(c.managerId) === String(user?.id));
+    }
+    setCustomers(rows);
     setLoading(false);
   };
 
-  useEffect(() => {
-    if (searchTerm) {
-      const filtered = customers.filter(c =>
-        c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        c.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        c.phone.includes(searchTerm) ||
-        c.id.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-      setFilteredCustomers(filtered);
-    } else {
-      setFilteredCustomers(customers);
-    }
-    setPage(0);
-  }, [searchTerm, customers]);
-
-  if (loading) return <Box>Loading...</Box>;
+  const filtered = searchTerm
+    ? customers.filter(
+        (c) =>
+          c.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          c.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          String(c.phone || '').includes(searchTerm) ||
+          String(c.id).toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    : customers;
 
   return (
     <Box>
       <Box sx={{ mb: 4 }}>
         <Typography variant="h4" fontWeight="bold" gutterBottom>
-          Customers
+          Customers {isManager && <Chip label="ASSIGNED ONLY" size="small" color="info" />}
         </Typography>
         <Typography variant="body1" color="textSecondary">
-          Manage all customer records
+          {isManager
+            ? 'Customers assigned to you by the Super Admin'
+            : 'Manage all customer records'}
         </Typography>
       </Box>
+
+      {loading && <LinearProgress sx={{ mb: 2 }} />}
+
+      {isManager && (
+        <Alert severity="info" sx={{ mb: 3 }}>
+          You can only see customers assigned to you. Assignment and transfers are
+          handled by the Super Admin.
+        </Alert>
+      )}
 
       {/* Search */}
       <Card sx={{ mb: 3 }}>
         <CardContent>
-          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-            <TextField
-              size="small"
-              placeholder="Search customers..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              InputProps={{
-                startAdornment: <Search sx={{ mr: 1, color: 'text.secondary' }} />,
-                endAdornment: searchTerm && (
-                  <IconButton size="small" onClick={() => setSearchTerm('')}>
-                    <Clear />
-                  </IconButton>
-                ),
-              }}
-              sx={{ flex: 1 }}
-            />
-          </Box>
+          <TextField
+            size="small"
+            fullWidth
+            placeholder="Search customers..."
+            value={searchTerm}
+            onChange={(e) => { setSearchTerm(e.target.value); setPage(0); }}
+            InputProps={{
+              startAdornment: <Search sx={{ mr: 1, color: 'text.secondary' }} />,
+              endAdornment: searchTerm && (
+                <IconButton size="small" onClick={() => setSearchTerm('')}>
+                  <Clear />
+                </IconButton>
+              ),
+            }}
+          />
         </CardContent>
       </Card>
 
       {/* Table */}
       <Card>
-        <TableContainer component={Paper} elevation={0}>
-          <Table>
+        <TableContainer component={Paper} elevation={0} sx={{ overflowX: 'auto' }}>
+          <Table sx={{ minWidth: 800 }}>
             <TableHead>
               <TableRow>
                 <TableCell>ID</TableCell>
@@ -105,51 +134,54 @@ const Customers = () => {
                 <TableCell>Email</TableCell>
                 <TableCell>Phone</TableCell>
                 <TableCell>City</TableCell>
+                {!isManager && <TableCell>Manager</TableCell>}
                 <TableCell>Applications</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {filteredCustomers
-                .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                .map((customer) => {
-                  const apps = getApplicationsByCustomer(customer.id);
-                  return (
-                    <TableRow key={customer.id} hover>
-                      <TableCell>{customer.id}</TableCell>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                          <Avatar sx={{ bgcolor: theme.palette.primary.main }}>
-                            {customer.name?.charAt(0)}
-                          </Avatar>
-                          <Box>
-                            <Typography variant="body2" fontWeight="500">
-                              {customer.name}
-                            </Typography>
-                            <Typography variant="caption" color="textSecondary">
-                              {customer.cnic || 'No CNIC'}
-                            </Typography>
-                          </Box>
+              {filtered.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((customer) => {
+                const apps = getApplicationsByCustomer(customer.id);
+                return (
+                  <TableRow key={customer.id} hover>
+                    <TableCell>{customer.id}</TableCell>
+                    <TableCell>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <Avatar sx={{ bgcolor: theme.palette.primary.main }}>
+                          {customer.name?.charAt(0)}
+                        </Avatar>
+                        <Box>
+                          <Typography variant="body2" fontWeight="500">
+                            {customer.name}
+                          </Typography>
+                          <Typography variant="caption" color="textSecondary">
+                            {customer.cnic || 'No CNIC'}
+                          </Typography>
                         </Box>
-                      </TableCell>
-                      <TableCell>{customer.email}</TableCell>
-                      <TableCell>{customer.phone}</TableCell>
-                      <TableCell>{customer.city}</TableCell>
+                      </Box>
+                    </TableCell>
+                    <TableCell>{customer.email}</TableCell>
+                    <TableCell>{customer.phone}</TableCell>
+                    <TableCell>{customer.city || '—'}</TableCell>
+                    {!isManager && (
                       <TableCell>
-                        <Chip
-                          label={apps.length}
-                          size="small"
-                          color="primary"
-                          variant="outlined"
-                        />
+                        {customer.managerId ? (
+                          <Chip label={`Manager #${customer.managerId}`} size="small" color="info" variant="outlined" />
+                        ) : (
+                          <Chip label="Unassigned" size="small" variant="outlined" />
+                        )}
                       </TableCell>
-                    </TableRow>
-                  );
-                })}
-              {filteredCustomers.length === 0 && (
+                    )}
+                    <TableCell>
+                      <Chip label={apps.length} size="small" color="primary" variant="outlined" />
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+              {filtered.length === 0 && !loading && (
                 <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                  <TableCell colSpan={isManager ? 6 : 7} align="center" sx={{ py: 4 }}>
                     <Typography color="textSecondary">
-                      No customers found
+                      {isManager ? 'No customers assigned to you yet.' : 'No customers found'}
                     </Typography>
                   </TableCell>
                 </TableRow>
@@ -160,7 +192,7 @@ const Customers = () => {
         <TablePagination
           rowsPerPageOptions={[5, 10, 25]}
           component="div"
-          count={filteredCustomers.length}
+          count={filtered.length}
           rowsPerPage={rowsPerPage}
           page={page}
           onPageChange={(e, newPage) => setPage(newPage)}

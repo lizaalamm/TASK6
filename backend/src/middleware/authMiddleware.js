@@ -4,10 +4,13 @@
  * Authentication + authorisation guards used by every protected route.
  *
  * Guards (use in this order on a route):
- *   1. `isAuthenticated`  — valid JWT required (populates req.user/req.userId)
- *   2. `requireAdmin`     — admin OR superadmin only
- *   3. `requireSuperAdmin`— superadmin only (platform-owner actions)
- *   4. `requireRoles(..)`— any custom list of roles
+ *   1. `isAuthenticated`   — valid JWT required (populates req.user/req.userId)
+ *   2. `requireAdmin`      — admin OR superadmin only
+ *   3. `requireSuperAdmin` — superadmin only (platform-owner actions)
+ *   4. `requireRoles(..)` — any custom list of roles
+ *   5. `requirePermission(..)` — permission-matrix check (see
+ *      `constants/permissions.js`). Always backed by row-level scoping in
+ *      the controller (assigned-only / own-only).
  *
  * Token sources (checked in order): `Authorization: Bearer <jwt>` header,
  * then the httpOnly `token` cookie.
@@ -17,6 +20,7 @@ const asyncHandler = require('express-async-handler');
 const { User } = require('../models');
 const { verifyToken } = require('../services/tokenService');
 const { fail } = require('../utils/apiResponse');
+const { can } = require('../constants/permissions');
 
 /**
  * Pull the JWT out of the request (header first, cookie fallback).
@@ -118,11 +122,29 @@ const requireRoles = (...roles) =>
     next();
   });
 
+/**
+ * Factory guard: allow ONLY roles holding a permission-matrix key.
+ * @example router.post('/x', isAuthenticated, requirePermission(PERMISSIONS.VEHICLES_CREATE), handler)
+ * @param {string} permission - One of PERMISSIONS.
+ * @returns Express middleware enforcing the permission matrix.
+ */
+const requirePermission = (permission) =>
+  asyncHandler(async (req, res, next) => {
+    if (!req.user) {
+      return fail(res, { status: 401, message: 'Not authenticated' });
+    }
+    if (!can(req.user.userType, permission)) {
+      return fail(res, { status: 403, message: 'You are not allowed to perform this action' });
+    }
+    next();
+  });
+
 module.exports = {
   extractUserId,
   isAuthenticated,
   requireAdmin,
   requireSuperAdmin,
   requireRoles,
+  requirePermission,
   getTokenFromRequest,
 };

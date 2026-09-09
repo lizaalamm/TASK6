@@ -11,6 +11,7 @@ require('./config/env'); // validates required env vars FIRST (throws if missing
 const app = require('./app');
 const { sequelize, initModels } = require('./models');
 const { seedUsers } = require('./seeders/seedUsers');
+const { seedShowroom } = require('./seeders/seedShowroom');
 const env = require('./config/env');
 
 const PORT = env.port;
@@ -28,6 +29,9 @@ const PORT = env.port;
 
     // 3. Insert demo accounts for any role missing from the DB.
     await seedUsers();
+
+    // 3b. Insert demo vehicles + a demo PENDING application (idempotent).
+    await seedShowroom();
 
     // 4. Bind to 0.0.0.0 so Docker / LAN / preview proxies can reach us.
     app.listen(PORT, '0.0.0.0', () => {

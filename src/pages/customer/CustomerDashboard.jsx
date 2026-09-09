@@ -22,8 +22,10 @@ import {
   Pending,
 } from '@mui/icons-material';
 import { useAuth } from '../../context/AuthContext';
-import { getApplicationsByCustomer } from '../../services/applicationService';
+import { fetchApplications, getApplicationsByCustomer } from '../../services/applicationService';
 import { getAvailableCars } from '../../services/carService';
+import { normalizeStatus, APPLICATION_STATUS } from '../../constants/applicationStatus';
+import ApplicationStatusChip from '../../components/applications/ApplicationStatusChip';
 
 const CustomerDashboard = () => {
   const navigate = useNavigate();
@@ -36,6 +38,9 @@ const CustomerDashboard = () => {
     completed: 0,
     rejected: 0,
     availableCars: 0,
+    paidAmount: 0,
+    remainingBalance: 0,
+    managerName: '',
   });
   const [recentApps, setRecentApps] = useState([]);
 
@@ -43,19 +48,31 @@ const CustomerDashboard = () => {
     if (user) {
       loadData();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
-  const loadData = () => {
-    const apps = getApplicationsByCustomer(user.id);
+  const loadData = async () => {
+    let apps = [];
+    try {
+      apps = (await fetchApplications({ customerId: user.id })).filter(
+        (a) => String(a.customerId) === String(user.id)
+      );
+    } catch {
+      apps = getApplicationsByCustomer(user.id);
+    }
     const availableCars = getAvailableCars();
+    const withManager = apps.find((a) => a.managerName || a.managerId);
 
     setStats({
       totalApplications: apps.length,
-      pending: apps.filter(a => a.status === 'Pending').length,
-      approved: apps.filter(a => a.status === 'Approved').length,
-      completed: apps.filter(a => a.status === 'Completed').length,
-      rejected: apps.filter(a => a.status === 'Rejected').length,
+      pending: apps.filter((a) => normalizeStatus(a.status) === APPLICATION_STATUS.PENDING).length,
+      approved: apps.filter((a) => normalizeStatus(a.status) === APPLICATION_STATUS.APPROVED).length,
+      completed: apps.filter((a) => normalizeStatus(a.status) === APPLICATION_STATUS.COMPLETE).length,
+      rejected: apps.filter((a) => normalizeStatus(a.status) === APPLICATION_STATUS.REJECTED).length,
       availableCars: availableCars.length,
+      paidAmount: apps.reduce((sum, a) => sum + Number(a.paidAmount || 0), 0),
+      remainingBalance: apps.reduce((sum, a) => sum + Number(a.remainingBalance || 0), 0),
+      managerName: withManager?.managerName || (withManager?.managerId ? `Manager #${withManager.managerId}` : ''),
     });
 
     setRecentApps(apps.slice(0, 3));
@@ -138,6 +155,37 @@ const CustomerDashboard = () => {
         </Grid>
       </Grid>
 
+      {/* Finance + manager summary (spec §7) */}
+      <Grid container spacing={3} sx={{ mb: 4 }}>
+        <Grid item xs={12} md={4}>
+          <Card>
+            <CardContent>
+              <Typography variant="caption" color="textSecondary">Assigned Manager</Typography>
+              <Typography variant="h6">{stats.managerName || 'Not assigned yet'}</Typography>
+              <Typography variant="caption" color="textSecondary">
+                Assigned by the Super Admin after approval
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={6} md={4}>
+          <Card sx={{ borderTop: `4px solid ${theme.palette.success.main}` }}>
+            <CardContent>
+              <Typography variant="caption" color="textSecondary">Total Paid (PKR)</Typography>
+              <Typography variant="h6" color="success.main">{stats.paidAmount.toLocaleString()}</Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={6} md={4}>
+          <Card sx={{ borderTop: `4px solid ${theme.palette.warning.main}` }}>
+            <CardContent>
+              <Typography variant="caption" color="textSecondary">Remaining Balance (PKR)</Typography>
+              <Typography variant="h6" color="warning.main">{stats.remainingBalance.toLocaleString()}</Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+
       {/* Quick Actions */}
       <Typography variant="h6" gutterBottom>
         Quick Actions
@@ -204,15 +252,7 @@ const CustomerDashboard = () => {
                       </Box>
                     </Box>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Chip
-                        label={app.status}
-                        size="small"
-                        color={
-                          app.status === 'Pending' ? 'warning' :
-                          app.status === 'Approved' ? 'info' :
-                          app.status === 'Completed' ? 'success' : 'error'
-                        }
-                      />
+                      <ApplicationStatusChip status={app.status} showStep={false} />
                       <Typography variant="caption" color="textSecondary">
                         {new Date(app.applicationDate).toLocaleDateString()}
                       </Typography>

@@ -40,10 +40,17 @@ import {
 import { getCars, deleteCar } from '../../services/carService';
 import { getSuppliers } from '../../services/supplierService';
 import { formatCurrency, getStatusColor } from '../../utils/calculations';
+import { useAuth } from '../../context/AuthContext';
+import { can, PERMISSIONS } from '../../constants/permissions';
 
 const Cars = () => {
   const navigate = useNavigate();
   const theme = useTheme();
+  const { user } = useAuth();
+  // Catalogue permissions (spec §2 matrix — the API re-checks everything).
+  const canCreate = can(user, PERMISSIONS.VEHICLES_CREATE);
+  const canUpdate = can(user, PERMISSIONS.VEHICLES_UPDATE);
+  const canDelete = can(user, PERMISSIONS.VEHICLES_DELETE);
   const [cars, setCars] = useState([]);
   const [filteredCars, setFilteredCars] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
@@ -154,13 +161,15 @@ const Cars = () => {
         <Typography variant="h4" fontWeight="bold">
           Cars Inventory
         </Typography>
-        <Button
-          variant="contained"
-          startIcon={<Add />}
-          onClick={() => navigate('/add-car')}
-        >
-          Add New Car
-        </Button>
+        {canCreate && (
+          <Button
+            variant="contained"
+            startIcon={<Add />}
+            onClick={() => navigate('/add-car')}
+          >
+            Add New Car
+          </Button>
+        )}
       </Box>
 
       {/* Filters - FULL WIDTH */}
@@ -299,24 +308,28 @@ const Cars = () => {
                           <Visibility />
                         </IconButton>
                       </Tooltip>
-                      <Tooltip title="Edit">
-                        <IconButton
-                          size="small"
-                          color="primary"
-                          onClick={() => navigate(`/edit-car/${car.id}`)}
-                        >
-                          <Edit />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Delete">
-                        <IconButton
-                          size="small"
-                          color="error"
-                          onClick={() => setDeleteDialog({ open: true, carId: car.id })}
-                        >
-                          <Delete />
-                        </IconButton>
-                      </Tooltip>
+                      {canUpdate && (
+                        <Tooltip title="Edit">
+                          <IconButton
+                            size="small"
+                            color="primary"
+                            onClick={() => navigate(`/edit-car/${car.id}`)}
+                          >
+                            <Edit />
+                          </IconButton>
+                        </Tooltip>
+                      )}
+                      {canDelete && (
+                        <Tooltip title="Delete">
+                          <IconButton
+                            size="small"
+                            color="error"
+                            onClick={() => setDeleteDialog({ open: true, carId: car.id })}
+                          >
+                            <Delete />
+                          </IconButton>
+                        </Tooltip>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}

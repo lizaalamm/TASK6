@@ -12,6 +12,7 @@ import {
   Divider,
   Chip,
   Paper,
+  Alert,
   useTheme,
 } from '@mui/material';
 import {
@@ -25,43 +26,48 @@ import {
   Cancel,
 } from '@mui/icons-material';
 import { getCustomerByEmail, updateCustomer } from '../../services/customerService';
+import api from '../../services/api';
+import { setData } from '../../services/localStorage';
+
+// Spec §7 — customers may view/update allowed personal information only.
+const ALLOWED_FIELDS = ['firstName', 'lastName', 'name', 'phone', 'address', 'city', 'cnic', 'cnicFront', 'cnicBack'];
 
 const CustomerProfilePage = () => {
   const theme = useTheme();
-  const { user, setUser } = useAuth();
+  const { user } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
   const [formData, setFormData] = useState({
+    firstName: '',
+    lastName: '',
     name: '',
     email: '',
     phone: '',
     address: '',
     city: '',
     cnic: '',
+    cnicFront: '',
+    cnicBack: '',
   });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (user) {
-      const customerData = getCustomerByEmail(user.email);
-      if (customerData) {
-        setFormData({
-          name: customerData.name || user.name || '',
-          email: customerData.email || user.email || '',
-          phone: customerData.phone || user.phone || '',
-          address: customerData.address || user.address || '',
-          city: customerData.city || user.city || '',
-          cnic: customerData.cnic || user.cnic || '',
-        });
-      } else {
-        setFormData({
-          name: user.name || '',
-          email: user.email || '',
-          phone: user.phone || '',
-          address: user.address || '',
-          city: user.city || '',
-          cnic: user.cnic || '',
-        });
-      }
+      const customerData = getCustomerByEmail(user.email) || {};
+      const parts = String(customerData.name || user.name || '').trim().split(/\s+/);
+      setFormData({
+        firstName: customerData.firstName || user.firstName || parts[0] || '',
+        lastName: customerData.lastName || user.lastName || (parts.length > 1 ? parts.slice(1).join(' ') : ''),
+        name: customerData.name || user.name || '',
+        email: customerData.email || user.email || '',
+        phone: customerData.phone || user.phone || '',
+        address: customerData.address || user.address || '',
+        city: customerData.city || user.city || '',
+        cnic: customerData.cnic || user.cnic || '',
+        cnicFront: customerData.cnicFront || user.cnic_front || user.cnicFront || '',
+        cnicBack: customerData.cnicBack || user.cnic_back || user.cnicBack || '',
+      });
     }
     setLoading(false);
   }, [user]);
@@ -71,18 +77,32 @@ const CustomerProfilePage = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSave = () => {
-    const customer = getCustomerByEmail(user.email);
-    if (customer) {
-      const updated = updateCustomer(customer.id, formData);
-      if (updated) {
-        const updatedUser = { ...user, ...formData };
-        setUser(updatedUser);
-        import('../../services/localStorage').then(({ setData }) => {
-          setData('udevs_session', updatedUser);
-        });
+  const handleSave = async () => {
+    setSaving(true);
+    setSaveError('');
+    // Only allowed fields leave the browser (the API strips the rest too).
+    const payload = {};
+    for (const key of ALLOWED_FIELDS) {
+      if (formData[key] !== undefined) payload[key] = formData[key];
+    }
+    payload.name = `${formData.firstName} ${formData.lastName}`.trim() || formData.name;
+    try {
+      const res = await api.put(`/users/user/${user.id}`, payload);
+      const updatedUser = { ...user, ...(res.data?.data || {}), ...payload };
+      setData('udevs_session', updatedUser);
+      setIsEditing(false);
+    } catch (err) {
+      // Offline fallback: persist to the local customer catalogue.
+      try {
+        const customer = getCustomerByEmail(user.email);
+        if (customer) updateCustomer(customer.id, payload);
+        setData('udevs_session', { ...user, ...payload });
         setIsEditing(false);
+      } catch {
+        setSaveError(err?.response?.data?.message || 'Could not save your profile.');
       }
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -157,8 +177,9 @@ const CustomerProfilePage = () => {
                       startIcon={<Save />}
                       variant="contained"
                       onClick={handleSave}
+                      disabled={saving}
                     >
-                      Save
+                      {saving ? 'Saving...' : 'Save'}
                     </Button>
                     <Button
                       startIcon={<Cancel />}
@@ -172,18 +193,31 @@ const CustomerProfilePage = () => {
                 )}
               </Box>
 
+              {saveError && (
+                <Alert severity="error" sx={{ mb: 2 }}>{saveError}</Alert>
+              )}
               <Grid container spacing={2}>
                 <Grid item xs={12} sm={6}>
                   <TextField
                     fullWidth
-                    label="Full Name"
-                    name="name"
-                    value={formData.name}
+                    label="First Name"
+                    name="firstName"
+                    value={formData.firstName}
                     onChange={handleChange}
                     disabled={!isEditing}
                     InputProps={{
                       startAdornment: <Person sx={{ mr: 1, color: 'text.secondary' }} />,
                     }}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    label="Last Name"
+                    name="lastName"
+                    value={formData.lastName}
+                    onChange={handleChange}
+                    disabled={!isEditing}
                   />
                 </Grid>
                 <Grid item xs={12} sm={6}>
@@ -225,6 +259,28 @@ const CustomerProfilePage = () => {
                     InputProps={{
                       startAdornment: <Badge sx={{ mr: 1, color: 'text.secondary' }} />,
                     }}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    label="CNIC Front (URL)"
+                    name="cnicFront"
+                    value={formData.cnicFront}
+                    onChange={handleChange}
+                    disabled={!isEditing}
+                    placeholder="https://…"
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    label="CNIC Back (URL)"
+                    name="cnicBack"
+                    value={formData.cnicBack}
+                    onChange={handleChange}
+                    disabled={!isEditing}
+                    placeholder="https://…"
                   />
                 </Grid>
                 <Grid item xs={12}>

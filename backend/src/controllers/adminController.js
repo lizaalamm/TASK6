@@ -3,20 +3,23 @@
  * ----------------------------------------------------------------------------
  * SUPERADMIN-ONLY endpoints mounted under `/api/admin/*`.
  * Powers the Super Admin dashboard: platform-wide counts, per-role breakdown,
- * recent signups and the list of leadership (admin) accounts.
- * Every route here is guarded by `requireSuperAdmin` in adminRoutes.js.
+ * recent signups, leadership accounts, pipeline stats, overdue installments
+ * and the audit trail. Every route here is guarded by `requireSuperAdmin`
+ * in adminRoutes.js.
  * ----------------------------------------------------------------------------
  */
 const asyncHandler = require('express-async-handler');
-const { fn, col } = require('sequelize');
-const { User } = require('../models');
+const { fn, col, Op } = require('sequelize');
+const { User, Application, Payment, AuditLog } = require('../models');
 const { sanitizeUser } = require('../utils/sanitizeUser');
 const { success } = require('../utils/apiResponse');
 const { ROLES } = require('../constants/roles');
+const { APPLICATION_STATUS } = require('../constants/applicationStatus');
 
 /**
  * GET /api/admin/stats — platform overview numbers.
- * @returns { total, active, inactive, terminated, byRole, recentUsers }
+ * @returns { total, active, inactive, terminated, byRole, recentUsers,
+ *            applications, overdueCount, revenue }
  */
 const getSystemStats = asyncHandler(async (req, res) => {
   // Total accounts on the platform.
@@ -45,6 +48,32 @@ const getSystemStats = asyncHandler(async (req, res) => {
     limit: 5,
   });
 
+  // Pipeline counts per status (spec §8).
+  const appRows = await Application.findAll({ attributes: ['status'] });
+  const applicationsByStatus = {};
+  for (const row of appRows) {
+    applicationsByStatus[row.status] = (applicationsByStatus[row.status] || 0) + 1;
+  }
+
+  // Overdue installments: balance + past-due with an active finance plan.
+  const overdueCount = await Application.count({
+    where: {
+      remainingBalance: { [Op.gt]: 0 },
+      nextDueDate: { [Op.lt]: new Date() },
+      status: {
+        [Op.in]: [APPLICATION_STATUS.FINANCE_SETUP, APPLICATION_STATUS.PAYMENT_IN_PROGRESS],
+      },
+    },
+  });
+
+  // Lifetime recorded revenue.
+  const revenueRows = await Payment.findAll({
+    where: { status: 'paid' },
+    attributes: [[fn('COALESCE', fn('SUM', col('amount')), 0), 'total']],
+    raw: true,
+  });
+  const revenue = Number(revenueRows?.[0]?.total || 0);
+
   return success(res, {
     message: 'System stats fetched',
     data: {
@@ -54,6 +83,9 @@ const getSystemStats = asyncHandler(async (req, res) => {
       terminated,
       byRole,
       recentUsers: recentRows.map(sanitizeUser),
+      applications: { total: appRows.length, byStatus: applicationsByStatus },
+      overdueCount,
+      revenue,
     },
   });
 });
@@ -74,7 +106,32 @@ const getAdminAccounts = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * GET /api/admin/audit-logs — paginated audit trail (spec §4).
+ * Query: `?limit=50&offset=0&action=&actorId=`
+ */
+const getAuditLogs = asyncHandler(async (req, res) => {
+  const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 50));
+  const offset = Math.max(0, Number(req.query.offset) || 0);
+  const where = {};
+  if (req.query.action) where.action = req.query.action;
+  if (req.query.actorId) where.actorId = req.query.actorId;
+  if (req.query.entityType) where.entityType = req.query.entityType;
+
+  const { rows, count } = await AuditLog.findAndCountAll({
+    where,
+    order: [['createdAt', 'DESC']],
+    limit,
+    offset,
+  });
+  return success(res, {
+    message: 'Audit logs fetched',
+    data: { total: count, limit, offset, logs: rows },
+  });
+});
+
 module.exports = {
   getSystemStats,
   getAdminAccounts,
+  getAuditLogs,
 };

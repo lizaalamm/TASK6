@@ -22,6 +22,7 @@ const {
   registerUser,
   getUserById,
   getUsersByTeamLead,
+  getManagers,
   getMe,
 } = require('../controllers/userController');
 const {
@@ -48,6 +49,8 @@ router.post('/register', registerValidator, registerUser);
 // --- Authenticated self-service ----------------------------------------------
 router.get('/me', isAuthenticated, getMe);
 router.get('/teamUsers/:teamLeadId', isAuthenticated, teamLeadParamValidator, getUsersByTeamLead);
+// Active managers for the Super Admin "assign manager" dropdown.
+router.get('/managers', isAuthenticated, getManagers);
 
 // --- User management ----------------------------------------------------------
 router.post('/user', isAuthenticated, requireAdmin, createUserValidator, createUser);

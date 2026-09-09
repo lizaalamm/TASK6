@@ -15,6 +15,7 @@ import {
   CardContent,
   Chip,
   Avatar,
+  Alert,
 } from '@mui/material';
 import {
   DirectionsCar,
@@ -142,14 +143,20 @@ const AdminDashboard = () => {
   return (
     <Box className="page-enter">
       {/* Page header */}
-      <Box sx={{ mb: 4 }}>
+      <Box sx={{ mb: 3 }}>
         <Typography variant="h4" fontWeight={800} gutterBottom>
-          Admin Dashboard
+          Admin Dashboard <Chip label="LIMITED" size="small" color="warning" sx={{ ml: 1, fontWeight: 700 }} />
         </Typography>
         <Typography variant="body1" color="textSecondary">
           Welcome back! Here&apos;s what&apos;s happening with your car showroom today.
         </Typography>
       </Box>
+
+      {/* Spec §5 — Admin operates within Super-Admin-granted modules only. */}
+      <Alert severity="info" sx={{ mb: 3 }}>
+        Limited operational access: application approval, manager assignment and order
+        completion are reserved for the Super Admin. All actions are verified on the server.
+      </Alert>
 
       {/* KPI cards with staggered entrance */}
       <Grid container spacing={3}>

@@ -21,6 +21,7 @@ import {
   ADMIN_ROLES,
   SUPERADMIN_ONLY,
   CUSTOMER_ONLY,
+  MANAGER_ONLY,
   homeRouteFor,
 } from '../constants/roles';
 
@@ -32,6 +33,7 @@ import Register from '../pages/auth/Register';
 import AdminDashboard from '../pages/admin/AdminDashboard';
 import SuperAdminDashboard from '../pages/superadmin/SuperAdminDashboard';
 import StaffDashboard from '../pages/staff/StaffDashboard';
+import ManagerDashboard from '../pages/manager/ManagerDashboard';
 
 // --- Inventory -------------------------------------------------------------------
 import Cars from '../pages/inventory/Cars';
@@ -99,6 +101,14 @@ const AppRoutes = () => {
           element={
             <RoleRoute allowedRoles={['sales', 'employee', 'teamlead']}>
               <StaffDashboard />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="/manager-dashboard"
+          element={
+            <RoleRoute allowedRoles={MANAGER_ONLY}>
+              <ManagerDashboard />
             </RoleRoute>
           }
         />

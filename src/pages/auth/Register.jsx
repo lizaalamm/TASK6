@@ -1,10 +1,10 @@
 /**
  * src/pages/auth/Register.jsx
  * ----------------------------------------------------------------------------
- * Sign-up screen: creates an account via POST /api/users/register, then
- * redirects to the role home page. Leadership roles (admin/superadmin) are
- * NOT offered here — the API also force-downgrades them to `customer` as a
- * safety net, so privileged accounts can only be minted by staff.
+ * Customer sign-up screen: creates a CUSTOMER account via
+ * POST /api/users/register, then redirects to the customer dashboard.
+ * Public registration is customer-only (spec §2) — staff accounts are
+ * created from the portal by the Super Admin / Admin.
  * ----------------------------------------------------------------------------
  */
 import React, { useState } from 'react';
@@ -19,7 +19,6 @@ import {
   Avatar,
   Alert,
   InputAdornment,
-  MenuItem,
   CircularProgress,
 } from '@mui/material';
 import { Email, Lock, Person, DirectionsCar, Phone } from '@mui/icons-material';
@@ -27,13 +26,6 @@ import { useAuth } from '../../context/AuthContext';
 import { homeRouteFor } from '../../constants/roles';
 import { seedData } from '../../data/seedData';
 import { seedInitialData } from '../../services/localStorage';
-
-/** Account types a visitor may self-select (no leadership roles). */
-const ACCOUNT_TYPES = [
-  { value: 'customer', label: 'Customer — browse + apply for cars' },
-  { value: 'employee', label: 'Employee — showroom staff' },
-  { value: 'sales', label: 'Sales — customer applications' },
-];
 
 const Register = () => {
   const navigate = useNavigate();
@@ -218,21 +210,10 @@ const Register = () => {
                 ),
               }}
             />
-            <TextField
-              select
-              fullWidth
-              label="Account type"
-              name="userType"
-              value={formData.userType}
-              onChange={handleChange}
-              margin="normal"
-            >
-              {ACCOUNT_TYPES.map((type) => (
-                <MenuItem key={type.value} value={type.value}>
-                  {type.label}
-                </MenuItem>
-              ))}
-            </TextField>
+            <Alert severity="info" sx={{ mt: 2, borderRadius: 2 }}>
+              You are registering as a <strong>Customer</strong> — browse the showroom
+              and apply for cars. Staff accounts are created by the showroom.
+            </Alert>
             <Button
               type="submit"
               fullWidth

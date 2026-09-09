@@ -30,8 +30,9 @@ import {
 } from '@mui/icons-material';
 import { getCarById } from '../../services/carService';
 import { formatCurrency } from '../../utils/calculations';
-import { addApplication } from '../../services/applicationService';
+import { createApplication } from '../../services/applicationService';
 import { useAuth } from '../../context/AuthContext';
+import { APPLICATION_STATUS } from '../../constants/applicationStatus';
 
 const CarDetailsPage = () => {
   const { id } = useParams();
@@ -58,7 +59,7 @@ const CarDetailsPage = () => {
     setLoading(false);
   };
 
-  const handleApply = () => {
+  const handleApply = async () => {
     if (!selectedColor) {
       setSnackbar({
         open: true,
@@ -77,11 +78,18 @@ const CarDetailsPage = () => {
       return;
     }
 
-    // Create application
+    // Quick-apply → PENDING (spec §8 step 1). API first, local fallback.
+    const parts = String(user.name || '').trim().split(/\s+/);
     const applicationData = {
       customerId: user.id,
+      firstName: user.firstName || parts[0] || '',
+      lastName: user.lastName || (parts.length > 1 ? parts.slice(1).join(' ') : ''),
+      email: user.email,
+      phone: user.phone || '',
+      cnic: user.cnic || '',
       carId: car.id,
       selectedColor,
+      color: selectedColor,
       carMake: car.make,
       carModel: car.model,
       carVariant: car.variant,
@@ -92,10 +100,21 @@ const CarDetailsPage = () => {
       customerAddress: user.address || '',
       customerCity: user.city || '',
       notes: 'Interested in this vehicle',
+      status: APPLICATION_STATUS.PENDING,
     };
 
-    addApplication(applicationData);
-    navigate('/application-success', { state: { carName: `${car.make} ${car.model}` } });
+    try {
+      const created = await createApplication(applicationData);
+      navigate('/application-success', {
+        state: { carName: `${car.make} ${car.model}`, applicationId: created?.id },
+      });
+    } catch (err) {
+      setSnackbar({
+        open: true,
+        message: err?.response?.data?.message || 'Could not submit the application.',
+        severity: 'error',
+      });
+    }
   };
 
   if (loading) return <Box>Loading...</Box>;

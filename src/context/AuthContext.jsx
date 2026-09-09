@@ -126,6 +126,7 @@ export const AuthProvider = ({ children }) => {
       isAuthenticated,
       isSuperAdmin: role === ROLES.SUPERADMIN,
       isAdmin: role === ROLES.ADMIN || role === ROLES.SUPERADMIN,
+      isManager: role === ROLES.MANAGER || role === ROLES.SUPERADMIN,
       isCustomer: role === ROLES.CUSTOMER,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps

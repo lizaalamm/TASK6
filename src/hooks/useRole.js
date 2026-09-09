@@ -27,6 +27,7 @@ import {
  *   color: string,
  *   isSuperAdmin: boolean,
  *   isAdmin: boolean,
+ *   isManager: boolean,
  *   isStaff: boolean,
  *   isCustomer: boolean,
  *   can: (roles: string[]) => boolean
@@ -39,6 +40,7 @@ export const useRole = () => {
     const role = getUserRole(user);
     const isSuperAdmin = role === ROLES.SUPERADMIN;
     const isAdmin = role === ROLES.ADMIN || isSuperAdmin;
+    const isManager = role === ROLES.MANAGER || isSuperAdmin;
     const isCustomer = role === ROLES.CUSTOMER;
 
     return {
@@ -46,9 +48,10 @@ export const useRole = () => {
       role,
       label: roleLabel(role),
       color: roleColor(role),
-      // Common flags.
+      // Common flags (superadmin inherits every staff flag).
       isSuperAdmin,
       isAdmin,
+      isManager,
       isStaff: Boolean(role) && !isCustomer,
       isCustomer,
       // Generic checker: `can(['sales', 'admin'])`.

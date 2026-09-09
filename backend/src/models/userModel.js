@@ -32,6 +32,16 @@ const User = sequelize.define(
       type: DataTypes.STRING(500),
       allowNull: false,
     },
+    // Spec §4 portal registration captures first + last name separately.
+    // `name` stays the display value (auto-composed when missing).
+    firstName: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+    },
+    lastName: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+    },
     // Unique login identifier (normalised to lowercase).
     email: {
       type: DataTypes.STRING(500),
@@ -44,6 +54,21 @@ const User = sequelize.define(
     // Optional FK → another User row acting as this user's team lead.
     teamLeadId: {
       type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+    // Assigned case manager (Super Admin assigns — spec §8 step 3).
+    // Managers see ONLY customers/applications matching this id.
+    managerId: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+    // Contact / address details (customer profile + applications).
+    address: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
+    city: {
+      type: DataTypes.STRING(255),
       allowNull: true,
     },
     // bcrypt hash — never select/return this to clients.
@@ -154,6 +179,16 @@ const User = sequelize.define(
         if (user.phone) {
           user.phone = String(user.phone).replace(/\s+/g, '');
         }
+        // Keep `name` and first/last name in sync (spec §4 registers both).
+        const first = String(user.firstName || '').trim();
+        const last = String(user.lastName || '').trim();
+        if (!user.name && (first || last)) {
+          user.name = `${first} ${last}`.trim();
+        } else if (user.name && !first && !last) {
+          const parts = String(user.name).trim().split(/\s+/);
+          user.firstName = parts[0] || null;
+          user.lastName = parts.length > 1 ? parts.slice(1).join(' ') : null;
+        }
       },
       // Hash the password when a row is first created.
       beforeCreate: async (user) => {
@@ -196,6 +231,14 @@ User.prototype.isSuperAdmin = function () {
  */
 User.prototype.isAdmin = function () {
   return this.userType === 'admin' || this.userType === 'superadmin';
+};
+
+/**
+ * True for case managers AND the superadmin (who inherits manager rights).
+ * @returns {boolean}
+ */
+User.prototype.isManager = function () {
+  return this.userType === 'manager' || this.userType === 'superadmin';
 };
 
 /**

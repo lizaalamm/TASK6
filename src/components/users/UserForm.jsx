@@ -1,13 +1,17 @@
 /**
  * src/components/users/UserForm.jsx
  * ----------------------------------------------------------------------------
- * Create / edit user dialog used by the Users screen.
+ * Create / edit user dialog used by the Users screen (portal registration,
+ * spec §4: First Name, Last Name, Email, Phone, CNIC, CNIC Front/Back,
+ * Role, Status).
  *
  * Props:
  *  - `user`            → object when editing, null when creating
- *  - `currentUserRole` → role of the logged-in staff member; the
- *                        "Super Admin" option is ONLY offered to superadmins
- *                        (the API enforces the same rule server-side).
+ *  - `currentUserRole` → role of the logged-in staff member; privileged
+ *                        roles are hidden per the permission matrix:
+ *                        superadmin sees all roles, admin sees all EXCEPT
+ *                        superadmin/admin (the API enforces the same rules
+ *                        server-side).
  * ----------------------------------------------------------------------------
  */
 import React, { useState, useEffect } from 'react';
@@ -35,6 +39,7 @@ import { ROLES, ROLE_LABELS } from '../../constants/roles';
 const ALL_ROLE_VALUES = [
   ROLES.SUPERADMIN,
   ROLES.ADMIN,
+  ROLES.MANAGER,
   ROLES.TEAMLEAD,
   ROLES.SALES,
   ROLES.INVENTORY,
@@ -44,11 +49,18 @@ const ALL_ROLE_VALUES = [
 
 /** Empty-form defaults for the "create" mode. */
 const EMPTY_FORM = {
+  firstName: '',
+  lastName: '',
   name: '',
   email: '',
   password: '',
   phone: '',
-  userType: 'employee',
+  cnic: '',
+  cnicFront: '',
+  cnicBack: '',
+  address: '',
+  city: '',
+  userType: 'customer',
   status: 'active',
 };
 
@@ -56,21 +68,31 @@ const UserForm = ({ open, onClose, onSubmit, user, loading, error, currentUserRo
   const [formData, setFormData] = useState(EMPTY_FORM);
   const [formErrors, setFormErrors] = useState({});
 
-  // Only superadmins may assign the superadmin role — hide it for admins.
-  const isSuperAdmin = String(currentUserRole || '').toLowerCase() === ROLES.SUPERADMIN;
-  const visibleRoles = ALL_ROLE_VALUES.filter(
-    (value) => value !== ROLES.SUPERADMIN || isSuperAdmin
-  );
+  // Role visibility per the permission matrix.
+  const normalized = String(currentUserRole || '').toLowerCase();
+  const isSuperAdmin = normalized === ROLES.SUPERADMIN;
+  const visibleRoles = ALL_ROLE_VALUES.filter((value) => {
+    if (isSuperAdmin) return true;
+    // Admins cannot create superadmin/admin accounts (API rejects too).
+    return value !== ROLES.SUPERADMIN && value !== ROLES.ADMIN;
+  });
 
   // Prefill when editing; reset when creating (or when the dialog reopens).
   useEffect(() => {
     if (user) {
       setFormData({
+        firstName: user.firstName || '',
+        lastName: user.lastName || '',
         name: user.name || '',
         email: user.email || '',
         password: '', // never prefill — blank means "keep existing"
         phone: user.phone || '',
-        userType: user.userType || user.role || 'employee',
+        cnic: user.cnic || '',
+        cnicFront: user.cnic_front || user.cnicFront || '',
+        cnicBack: user.cnic_back || user.cnicBack || '',
+        address: user.address || '',
+        city: user.city || '',
+        userType: user.userType || user.role || 'customer',
         status: (user.status || 'active').toLowerCase(),
       });
     } else {
@@ -91,11 +113,16 @@ const UserForm = ({ open, onClose, onSubmit, user, loading, error, currentUserRo
   /** Client-side validation (the API re-validates everything server-side). */
   const validateForm = () => {
     const errors = {};
-    if (!formData.name.trim()) errors.name = 'Name is required';
+    if (!formData.firstName.trim() && !formData.name.trim()) {
+      errors.firstName = 'First name is required';
+    }
     if (!formData.email.trim()) errors.email = 'Email is required';
     else if (!/\S+@\S+\.\S+/.test(formData.email)) errors.email = 'Invalid email format';
     if (!user && !formData.password) errors.password = 'Password is required for new user';
     else if (!user && formData.password.length < 8) errors.password = 'Password must be at least 8 characters';
+    if (formData.cnic && !/^\d{5}-\d{7}-\d{1}$|^\d{13}$/.test(formData.cnic.trim())) {
+      errors.cnic = 'CNIC must be XXXXX-XXXXXXX-X or 13 digits';
+    }
     if (!formData.userType) errors.userType = 'Role is required';
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
@@ -106,20 +133,30 @@ const UserForm = ({ open, onClose, onSubmit, user, loading, error, currentUserRo
     e.preventDefault();
     if (!validateForm()) return;
 
+    const displayName =
+      formData.name.trim() ||
+      `${formData.firstName.trim()} ${formData.lastName.trim()}`.trim();
     const submitData = {
-      name: formData.name,
-      email: formData.email,
+      firstName: formData.firstName.trim() || undefined,
+      lastName: formData.lastName.trim() || undefined,
+      name: displayName,
+      email: formData.email.trim(),
       userType: formData.userType,
       role: formData.userType, // backend accepts either key
       status: formData.status,
     };
-    if (formData.phone) submitData.phone = formData.phone.replace(/\s+/g, '');
+    if (formData.phone.trim()) submitData.phone = formData.phone.replace(/\s+/g, '');
+    if (formData.cnic.trim()) submitData.cnic = formData.cnic.trim();
+    if (formData.cnicFront.trim()) submitData.cnic_front = formData.cnicFront.trim();
+    if (formData.cnicBack.trim()) submitData.cnic_back = formData.cnicBack.trim();
+    if (formData.address.trim()) submitData.address = formData.address.trim();
+    if (formData.city.trim()) submitData.city = formData.city.trim();
     if (formData.password) submitData.password = formData.password;
     onSubmit(submitData);
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       {/* Dialog header with mode icon */}
       <DialogTitle>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
@@ -134,36 +171,60 @@ const UserForm = ({ open, onClose, onSubmit, user, loading, error, currentUserRo
           </Avatar>
           <Box>
             <Typography variant="h6" fontWeight={700}>
-              {user ? 'Edit User' : 'Add New User'}
+              {user ? 'Edit User' : 'Register User'}
             </Typography>
             <Typography variant="caption" color="textSecondary">
-              {user ? `Updating ${user.name}` : 'Create a showroom account'}
+              {user ? `Updating ${user.name}` : 'Portal registration — name, contact, CNIC, role, status'}
             </Typography>
           </Box>
         </Box>
       </DialogTitle>
 
       <form onSubmit={handleSubmit}>
-        <DialogContent>
+        <DialogContent dividers>
           {error && (
             <Alert severity="error" sx={{ mb: 2 }}>
               {error}
             </Alert>
           )}
+          {!isSuperAdmin && !user && (
+            <Alert severity="info" sx={{ mb: 2 }}>
+              As an Admin you can register Manager, Customer and staff accounts.
+              Super Admin and Admin accounts can only be created by a Super Admin.
+            </Alert>
+          )}
           <Grid container spacing={2}>
-            <Grid item xs={12}>
+            <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
-                label="Full Name"
-                name="name"
-                value={formData.name}
+                label="First Name"
+                name="firstName"
+                value={formData.firstName}
                 onChange={handleChange}
-                error={!!formErrors.name}
-                helperText={formErrors.name}
-                required
+                error={!!formErrors.firstName}
+                helperText={formErrors.firstName}
+                required={!user}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Last Name"
+                name="lastName"
+                value={formData.lastName}
+                onChange={handleChange}
               />
             </Grid>
             <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Display Name (optional — auto-composed when blank)"
+                name="name"
+                value={formData.name}
+                onChange={handleChange}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
                 label="Email"
@@ -176,7 +237,7 @@ const UserForm = ({ open, onClose, onSubmit, user, loading, error, currentUserRo
                 required
               />
             </Grid>
-            <Grid item xs={12}>
+            <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
                 label="Phone"
@@ -187,7 +248,6 @@ const UserForm = ({ open, onClose, onSubmit, user, loading, error, currentUserRo
                 helperText="Format: 03XXXXXXXXX or +92XXXXXXXXXX"
               />
             </Grid>
-            {/* Password only on create — edits keep the old hash when blank. */}
             {!user && (
               <Grid item xs={12}>
                 <TextField
@@ -203,6 +263,56 @@ const UserForm = ({ open, onClose, onSubmit, user, loading, error, currentUserRo
                 />
               </Grid>
             )}
+            <Grid item xs={12} sm={4}>
+              <TextField
+                fullWidth
+                label="CNIC"
+                name="cnic"
+                value={formData.cnic}
+                onChange={handleChange}
+                error={!!formErrors.cnic}
+                helperText={formErrors.cnic || 'XXXXX-XXXXXXX-X'}
+                placeholder="12345-6789012-3"
+              />
+            </Grid>
+            <Grid item xs={12} sm={4}>
+              <TextField
+                fullWidth
+                label="CNIC Front (URL)"
+                name="cnicFront"
+                value={formData.cnicFront}
+                onChange={handleChange}
+                placeholder="https://…"
+              />
+            </Grid>
+            <Grid item xs={12} sm={4}>
+              <TextField
+                fullWidth
+                label="CNIC Back (URL)"
+                name="cnicBack"
+                value={formData.cnicBack}
+                onChange={handleChange}
+                placeholder="https://…"
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Address"
+                name="address"
+                value={formData.address}
+                onChange={handleChange}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="City"
+                name="city"
+                value={formData.city}
+                onChange={handleChange}
+              />
+            </Grid>
             <Grid item xs={12} sm={6}>
               <FormControl fullWidth error={!!formErrors.userType}>
                 <InputLabel>Role</InputLabel>
@@ -241,7 +351,7 @@ const UserForm = ({ open, onClose, onSubmit, user, loading, error, currentUserRo
             Cancel
           </Button>
           <Button type="submit" variant="contained" disabled={loading}>
-            {loading ? 'Saving...' : user ? 'Update' : 'Create'}
+            {loading ? 'Saving...' : user ? 'Update' : 'Register'}
           </Button>
         </DialogActions>
       </form>
