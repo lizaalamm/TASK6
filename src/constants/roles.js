@@ -6,7 +6,11 @@
  * components, so adding a role later means editing one file, not twenty.
  *
  * Hierarchy (most → least privilege):
- *   superadmin > admin > teamlead > sales/inventory/employee > customer
+ *   superadmin > admin > manager/teamlead > sales/inventory/employee > customer
+ *
+ * Core showroom roles (U Devs spec §2): superadmin (FULL), admin (LIMITED),
+ * manager (ASSIGNED-ONLY), customer (OWN DATA). teamlead/sales/inventory/
+ * employee are legacy staff roles kept for backwards compatibility.
  * ----------------------------------------------------------------------------
  */
 
@@ -14,6 +18,7 @@
 export const ROLES = Object.freeze({
   SUPERADMIN: 'superadmin',
   ADMIN: 'admin',
+  MANAGER: 'manager',
   TEAMLEAD: 'teamlead',
   SALES: 'sales',
   INVENTORY: 'inventory',
@@ -28,6 +33,7 @@ export const ALL_ROLES = Object.freeze(Object.values(ROLES));
 export const ROLE_LABELS = Object.freeze({
   [ROLES.SUPERADMIN]: 'Super Admin',
   [ROLES.ADMIN]: 'Admin',
+  [ROLES.MANAGER]: 'Manager',
   [ROLES.TEAMLEAD]: 'Team Lead',
   [ROLES.SALES]: 'Sales',
   [ROLES.INVENTORY]: 'Inventory',
@@ -39,6 +45,7 @@ export const ROLE_LABELS = Object.freeze({
 export const ROLE_COLORS = Object.freeze({
   [ROLES.SUPERADMIN]: '#7B1FA2', // royal purple — the platform owner
   [ROLES.ADMIN]: '#C62828', // deep red — showroom manager
+  [ROLES.MANAGER]: '#00838F', // teal — case owner
   [ROLES.TEAMLEAD]: '#1565C0', // blue — team leadership
   [ROLES.SALES]: '#2E7D32', // green — revenue team
   [ROLES.INVENTORY]: '#EF6C00', // orange — stock team
@@ -52,6 +59,7 @@ export const ROLE_COLORS = Object.freeze({
 export const STAFF_ROLES = Object.freeze([
   ROLES.SUPERADMIN,
   ROLES.ADMIN,
+  ROLES.MANAGER,
   ROLES.SALES,
   ROLES.INVENTORY,
   ROLES.EMPLOYEE,
@@ -62,10 +70,17 @@ export const STAFF_ROLES = Object.freeze([
 export const SALES_ROLES = Object.freeze([
   ROLES.SUPERADMIN,
   ROLES.ADMIN,
+  ROLES.MANAGER,
   ROLES.SALES,
   ROLES.EMPLOYEE,
   ROLES.TEAMLEAD,
 ]);
+
+/** Roles allowed on the manager dashboard (assigned-only pipeline). */
+export const MANAGER_ROLES = Object.freeze([ROLES.SUPERADMIN, ROLES.MANAGER]);
+
+/** Case owner only (superadmin bypasses via hasAnyRole). */
+export const MANAGER_ONLY = Object.freeze([ROLES.MANAGER]);
 
 /** Roles allowed to manage cars + suppliers stock. */
 export const INVENTORY_ROLES = Object.freeze([
@@ -120,6 +135,7 @@ export const hasAnyRole = (user, allowedRoles = []) => {
 export const homeRouteFor = (user) => {
   const role = getUserRole(user);
   if (role === ROLES.SUPERADMIN) return '/superadmin';
+  if (role === ROLES.MANAGER) return '/manager-dashboard';
   if (role === ROLES.CUSTOMER) return '/customer-dashboard';
   return '/dashboard';
 };

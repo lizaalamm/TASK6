@@ -13,6 +13,7 @@
  *  |------------|---------------------|---------------|
  *  | Superadmin | superadmin@udevs.com| Super@123     |
  *  | Admin      | admin@udevs.com     | Admin@123     |
+ *  | Manager    | manager@udevs.com   | Manager@123   |
  *  | Sales      | sales@udevs.com     | Sales@123     |
  *  | Inventory  | inventory@udevs.com | Inventory@123 |
  *  | Customer   | customer@udevs.com  | Customer@123  |
@@ -25,6 +26,8 @@ const { User } = require('../models');
 const demoUsers = [
   {
     name: 'Super Admin',
+    firstName: 'Super',
+    lastName: 'Admin',
     email: 'superadmin@udevs.com',
     password: 'Super@123',
     userType: 'superadmin', // platform owner — manages admins too
@@ -34,6 +37,8 @@ const demoUsers = [
   },
   {
     name: 'Admin User',
+    firstName: 'Admin',
+    lastName: 'User',
     email: 'admin@udevs.com',
     password: 'Admin@123',
     userType: 'admin',
@@ -42,7 +47,20 @@ const demoUsers = [
     status: 'active',
   },
   {
+    name: 'Case Manager',
+    firstName: 'Case',
+    lastName: 'Manager',
+    email: 'manager@udevs.com',
+    password: 'Manager@123',
+    userType: 'manager', // assigned-only case owner (spec §2)
+    phone: '03210000001',
+    cnic: '11111-1111111-2',
+    status: 'active',
+  },
+  {
     name: 'Sales Manager',
+    firstName: 'Sales',
+    lastName: 'Manager',
     email: 'sales@udevs.com',
     password: 'Sales@123',
     userType: 'sales',
@@ -52,6 +70,8 @@ const demoUsers = [
   },
   {
     name: 'Inventory Manager',
+    firstName: 'Inventory',
+    lastName: 'Manager',
     email: 'inventory@udevs.com',
     password: 'Inventory@123',
     userType: 'inventory',
@@ -61,15 +81,21 @@ const demoUsers = [
   },
   {
     name: 'John Customer',
+    firstName: 'John',
+    lastName: 'Customer',
     email: 'customer@udevs.com',
     password: 'Customer@123',
     userType: 'customer',
     phone: '03214567890',
     cnic: '45678-9012345-6',
+    address: '123 Main Street, Lahore',
+    city: 'Lahore',
     status: 'active',
   },
   {
     name: 'Team Lead',
+    firstName: 'Team',
+    lastName: 'Lead',
     email: 'lead@udevs.com',
     password: 'Lead@1234',
     userType: 'teamlead',

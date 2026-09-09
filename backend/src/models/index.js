@@ -6,10 +6,20 @@
  *
  * Relations:
  *   User (team lead) 1───* User (team member)  through `teamLeadId`
+ *   User (manager)   1───* User (customer)     through `managerId`
+ *   User (customer)  1───* Application         through `customerId`
+ *   User (manager)   1───* Application         through `managerId`
+ *   Vehicle          1───* Application         through `vehicleId`
+ *   Application      1───* Payment             through `applicationId`
+ *   User (customer)  1───* Payment             through `customerId`
  * ----------------------------------------------------------------------------
  */
 const sequelize = require('../config/db');
 const User = require('./userModel');
+const Vehicle = require('./vehicleModel');
+const Application = require('./applicationModel');
+const Payment = require('./paymentModel');
+const AuditLog = require('./auditLogModel');
 const { ALLOWED_TYPES } = require('../constants/roles');
 
 // Each user optionally belongs to one team lead (self-referencing FK).
@@ -26,9 +36,46 @@ User.hasMany(User, {
   constraints: false,
 });
 
+// Each customer is optionally assigned one case manager (Super Admin assigns).
+User.belongsTo(User, {
+  as: 'manager',
+  foreignKey: 'managerId',
+  constraints: false,
+});
+
+// ...and each manager owns many customers.
+User.hasMany(User, {
+  as: 'managedCustomers',
+  foreignKey: 'managerId',
+  constraints: false,
+});
+
+// Applications belong to a customer (+ optional manager / vehicle).
+Application.belongsTo(User, { as: 'customer', foreignKey: 'customerId', constraints: false });
+Application.belongsTo(User, { as: 'manager', foreignKey: 'managerId', constraints: false });
+Application.belongsTo(Vehicle, { as: 'vehicle', foreignKey: 'vehicleId', constraints: false });
+User.hasMany(Application, { as: 'applications', foreignKey: 'customerId', constraints: false });
+User.hasMany(Application, {
+  as: 'managedApplications',
+  foreignKey: 'managerId',
+  constraints: false,
+});
+Vehicle.hasMany(Application, { as: 'applications', foreignKey: 'vehicleId', constraints: false });
+
+// Payments belong to an application + customer.
+Payment.belongsTo(Application, {
+  as: 'application',
+  foreignKey: 'applicationId',
+  constraints: false,
+});
+Payment.belongsTo(User, { as: 'customer', foreignKey: 'customerId', constraints: false });
+Payment.belongsTo(User, { as: 'manager', foreignKey: 'managerId', constraints: false });
+Application.hasMany(Payment, { as: 'payments', foreignKey: 'applicationId', constraints: false });
+User.hasMany(Payment, { as: 'payments', foreignKey: 'customerId', constraints: false });
+
 /**
  * Make sure the PostgreSQL ENUM type for `userType` contains every role.
- * Postgres ENUMs are rigid — adding a value (e.g. `superadmin`) to the model
+ * Postgres ENUMs are rigid — adding a value (e.g. `manager`) to the model
  * WITHOUT altering the type first makes `sync({ alter: true })` crash on an
  * existing database. This helper adds any missing values safely.
  */
@@ -70,5 +117,9 @@ const initModels = async () => {
 module.exports = {
   sequelize,
   User,
+  Vehicle,
+  Application,
+  Payment,
+  AuditLog,
   initModels,
 };

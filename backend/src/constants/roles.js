@@ -3,17 +3,29 @@
  * ----------------------------------------------------------------------------
  * Single source of truth for every user role in the system.
  *
- * Role hierarchy (highest privilege first):
- *   superadmin > admin > teamlead > sales / inventory / employee > customer
+ * Core showroom roles (per U Devs spec):
+ *   superadmin > admin > manager > customer
  *
- * - `superadmin` : platform owner. Can manage EVERYTHING, including admins.
- * - `admin`      : showroom manager. Can manage staff + customers, but NOT
- *                  superadmin accounts.
- * - `teamlead`   : leads a sales team, sees only their own team members.
- * - `sales`      : handles customers + car applications.
- * - `inventory`  : manages cars + suppliers stock.
+ * Legacy / specialised staff roles kept for backwards compatibility:
+ *   teamlead / sales / inventory / employee
+ *
+ * - `superadmin` : platform owner. FULL access — manages everything, including
+ *                  admins. Only role that can approve/reject applications,
+ *                  assign managers and complete orders.
+ * - `admin`      : showroom manager. LIMITED operational access within the
+ *                  permissions granted by Super Admin. Cannot create
+ *                  superadmins/admins, approve protected applications or
+ *                  assign managers.
+ * - `manager`    : case owner. ASSIGNED-ONLY — sees only customers /
+ *                  applications where `managerId` matches their own id.
+ *                  Verifies documents, selects vehicles, configures finance
+ *                  plans and records permitted payments.
+ * - `teamlead`   : legacy sales-team lead (ranked with manager).
+ * - `sales`      : legacy sales staff — customers + applications (view).
+ * - `inventory`  : legacy stock staff — cars + suppliers.
  * - `employee`   : generic staff member (default for new staff).
- * - `customer`   : showroom visitor. Can browse cars + apply for them.
+ * - `customer`   : showroom visitor. OWN DATA only — own profile, own
+ *                  applications, own finance plan and payment history.
  * ----------------------------------------------------------------------------
  */
 
@@ -21,6 +33,7 @@
 const ROLES = Object.freeze({
   SUPERADMIN: 'superadmin',
   ADMIN: 'admin',
+  MANAGER: 'manager',
   TEAMLEAD: 'teamlead',
   SALES: 'sales',
   INVENTORY: 'inventory',
@@ -35,6 +48,7 @@ const ALLOWED_TYPES = Object.freeze(Object.values(ROLES));
 const STAFF_ROLES = Object.freeze([
   ROLES.SUPERADMIN,
   ROLES.ADMIN,
+  ROLES.MANAGER,
   ROLES.SALES,
   ROLES.INVENTORY,
   ROLES.EMPLOYEE,
@@ -49,6 +63,7 @@ const ROLE_RANK = Object.freeze({
   [ROLES.SALES]: 3,
   [ROLES.INVENTORY]: 3,
   [ROLES.TEAMLEAD]: 4,
+  [ROLES.MANAGER]: 4,
   [ROLES.ADMIN]: 5,
   [ROLES.SUPERADMIN]: 6,
 });

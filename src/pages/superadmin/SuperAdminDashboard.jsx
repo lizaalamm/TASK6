@@ -8,6 +8,9 @@
  *  2. Role distribution — per-role counts with animated progress bars
  *  3. Leadership table — every superadmin + admin account on the platform
  *  4. Recent signups — the 5 newest users
+ *  5. Review queue — PENDING + unassigned APPROVED applications (spec §8.2-3)
+ *  6. Overdue installments — past-due applications with a balance (spec §4)
+ *  7. Audit logs — latest privileged actions (spec §4)
  *
  * Data comes from the superadmin-only API (`GET /api/admin/stats` and
  * `GET /api/admin/admins`) so numbers are always live, never mocked.
@@ -42,9 +45,18 @@ import {
   PersonOff,
   Shield,
   PersonAdd,
+  Assignment,
+  Warning,
+  History,
 } from '@mui/icons-material';
 import api from '../../services/api';
 import { roleLabel, roleColor } from '../../constants/roles';
+import { useAuth } from '../../context/AuthContext';
+import { normalizeStatus } from '../../constants/applicationStatus';
+import { fetchApplications, fetchOverdueApplications } from '../../services/applicationService';
+import { fetchAuditLogs } from '../../services/auditService';
+import ApplicationStatusChip from '../../components/applications/ApplicationStatusChip';
+import ApplicationActionButtons from '../../components/applications/ApplicationActionButtons';
 
 /** Gradient backgrounds cycling across the KPI cards. */
 const CARD_GRADIENTS = [
@@ -55,34 +67,62 @@ const CARD_GRADIENTS = [
 ];
 
 const SuperAdminDashboard = () => {
+  const { user } = useAuth();
   // --- State ------------------------------------------------------------------
   const [stats, setStats] = useState(null); // { total, active, ..., byRole, recentUsers }
   const [admins, setAdmins] = useState([]); // leadership accounts
+  const [reviewQueue, setReviewQueue] = useState([]); // PENDING + unassigned APPROVED
+  const [overdue, setOverdue] = useState([]); // past-due applications with balance
+  const [auditLogs, setAuditLogs] = useState([]); // latest privileged actions
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // --- Load both superadmin endpoints in parallel on mount --------------------
+  // --- Load superadmin endpoints + pipeline data in parallel on mount ---------
+  const load = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const [statsRes, adminsRes, apps, overdueApps, audit] = await Promise.all([
+        api.get('/admin/stats'),
+        api.get('/admin/admins'),
+        fetchApplications().catch(() => []),
+        fetchOverdueApplications().catch(() => []),
+        fetchAuditLogs({ limit: 10 }).catch(() => ({ logs: [] })),
+      ]);
+      setStats(statsRes.data?.data || null);
+      setAdmins(adminsRes.data?.data || []);
+      const queue = (apps || []).filter((a) => {
+        const s = normalizeStatus(a.status);
+        return s === 'PENDING' || (s === 'APPROVED' && !a.managerId);
+      });
+      setReviewQueue(queue);
+      setOverdue(overdueApps || []);
+      setAuditLogs(audit?.logs || []);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Could not load system statistics.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      setError('');
-      try {
-        const [statsRes, adminsRes] = await Promise.all([
-          api.get('/admin/stats'),
-          api.get('/admin/admins'),
-        ]);
-        setStats(statsRes.data?.data || null);
-        setAdmins(adminsRes.data?.data || []);
-      } catch (err) {
-        setError(
-          err.response?.data?.message || 'Could not load system statistics.'
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const handleQueueUpdated = (updated) => {
+    if (!updated) {
+      load();
+      return;
+    }
+    // Drop rows that left the queue (reviewed / assigned).
+    const s = normalizeStatus(updated.status);
+    if (s === 'PENDING' || (s === 'APPROVED' && !updated.managerId)) {
+      setReviewQueue((prev) => prev.map((a) => (String(a.id) === String(updated.id) ? updated : a)));
+    } else {
+      setReviewQueue((prev) => prev.filter((a) => String(a.id) !== String(updated.id)));
+    }
+  };
 
   // --- Derived: KPI card definitions -------------------------------------------
   const kpiCards = [
@@ -391,6 +431,156 @@ const SuperAdminDashboard = () => {
           </Grid>
         </CardContent>
       </Card>
+
+      {/* ===== Review queue (PENDING + unassigned APPROVED) ======================== */}
+      <Card sx={{ mt: 3 }}>
+        <CardContent>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Assignment color="primary" />
+            <Typography variant="h6" fontWeight={700}>
+              Application Review Queue
+            </Typography>
+            <Chip label={reviewQueue.length} size="small" color="primary" sx={{ ml: 1 }} />
+          </Box>
+          <Typography variant="caption" color="textSecondary">
+            Spec §8 steps 2–3 — only the Super Admin reviews documents and assigns managers.
+          </Typography>
+          <Divider sx={{ my: 2 }} />
+          {loading ? (
+            <Skeleton height={60} />
+          ) : reviewQueue.length === 0 ? (
+            <Typography color="textSecondary">Queue is clear — nothing awaiting review.</Typography>
+          ) : (
+            <TableContainer component={Paper} elevation={0} sx={{ overflowX: 'auto' }}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell><strong>ID</strong></TableCell>
+                    <TableCell><strong>Applicant</strong></TableCell>
+                    <TableCell><strong>CNIC</strong></TableCell>
+                    <TableCell><strong>Status</strong></TableCell>
+                    <TableCell align="center"><strong>Actions</strong></TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {reviewQueue.map((app) => (
+                    <TableRow key={app.id} hover>
+                      <TableCell>{app.id}</TableCell>
+                      <TableCell>
+                        <Typography variant="body2" fontWeight={600}>
+                          {app.customerName || `${app.firstName || ''} ${app.lastName || ''}`.trim() || 'Applicant'}
+                        </Typography>
+                        <Typography variant="caption" color="textSecondary">
+                          {app.customerEmail || app.email}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>{app.cnic || '—'}</TableCell>
+                      <TableCell><ApplicationStatusChip status={app.status} /></TableCell>
+                      <TableCell align="center">
+                        <ApplicationActionButtons user={user} app={app} onUpdated={handleQueueUpdated} compact />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ===== Overdue installments + audit trail ================================== */}
+      <Grid container spacing={3} sx={{ mt: 1 }}>
+        <Grid item xs={12} md={6}>
+          <Card sx={{ height: '100%' }}>
+            <CardContent>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Warning color="warning" />
+                <Typography variant="h6" fontWeight={700}>
+                  Overdue Installments
+                </Typography>
+                <Chip label={overdue.length} size="small" color="warning" sx={{ ml: 1 }} />
+              </Box>
+              <Divider sx={{ my: 2 }} />
+              {overdue.length === 0 ? (
+                <Typography color="textSecondary">No overdue installments.</Typography>
+              ) : (
+                overdue.slice(0, 8).map((app) => (
+                  <Box key={app.id} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
+                    <Avatar sx={{ width: 32, height: 32, bgcolor: '#EF6C00' }}>
+                      {(app.customerName || app.email || '?').charAt(0)}
+                    </Avatar>
+                    <Box sx={{ flex: 1 }}>
+                      <Typography variant="body2" fontWeight={600}>
+                        #{app.id} — {app.customerName || app.email}
+                      </Typography>
+                      <Typography variant="caption" color="textSecondary">
+                        Due {app.nextDueDate ? new Date(app.nextDueDate).toLocaleDateString() : '—'} ·
+                        PKR {Number(app.remainingBalance || 0).toLocaleString()} remaining
+                      </Typography>
+                    </Box>
+                  </Box>
+                ))
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12} md={6}>
+          <Card sx={{ height: '100%' }}>
+            <CardContent>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <History color="primary" />
+                <Typography variant="h6" fontWeight={700}>
+                  Audit Trail
+                </Typography>
+              </Box>
+              <Typography variant="caption" color="textSecondary">
+                Latest privileged actions across the platform.
+              </Typography>
+              <Divider sx={{ my: 2 }} />
+              {auditLogs.length === 0 ? (
+                <Typography color="textSecondary">
+                  No audit entries yet — actions are logged once the API is online.
+                </Typography>
+              ) : (
+                <TableContainer component={Paper} elevation={0}>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell><strong>When</strong></TableCell>
+                        <TableCell><strong>Actor</strong></TableCell>
+                        <TableCell><strong>Action</strong></TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {auditLogs.map((log) => (
+                        <TableRow key={log.id} hover>
+                          <TableCell>
+                            <Typography variant="caption">
+                              {new Date(log.createdAt).toLocaleString()}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="body2">{log.actorName || `#${log.actorId}`}</Typography>
+                            <Typography variant="caption" color="textSecondary">{log.actorRole}</Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Chip label={log.action} size="small" variant="outlined" />
+                            {log.entityType && (
+                              <Typography variant="caption" display="block" color="textSecondary">
+                                {log.entityType} #{log.entityId}
+                              </Typography>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
     </Box>
   );
 };

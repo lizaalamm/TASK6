@@ -36,9 +36,9 @@ const {
 const normalizeType = (value) => {
   if (!value) return undefined;
   const raw = String(value).trim().toLowerCase();
+  // NOTE: `manager` is a first-class role (spec §2) — NOT an alias of teamlead.
   const aliases = {
     user: 'employee',
-    manager: 'teamlead',
     'team-lead': 'teamlead',
     team_lead: 'teamlead',
     teamlead: 'teamlead',
@@ -75,18 +75,27 @@ const buildUserPayload = (body, { isCreate = false } = {}) => {
 
   const payload = {
     name: body.name,
+    firstName: body.firstName || null,
+    lastName: body.lastName || null,
     email: body.email,
     phone: body.phone || null,
     cnic: body.cnic || null,
     avatar: body.avatar || null,
-    cnic_front: body.cnic_front || null,
-    cnic_back: body.cnic_back || null,
+    cnic_front: body.cnic_front || body.cnicFront || null,
+    cnic_back: body.cnic_back || body.cnicBack || null,
     teamLeadId: body.teamLeadId || null,
+    managerId: body.managerId || null,
+    address: body.address || null,
+    city: body.city || null,
     joiningDate: body.joiningDate || null,
     terminatedDate: body.terminatedDate || null,
     isTeamLead: Boolean(body.isTeamLead) || userType === 'teamlead',
     isTerminated: Boolean(body.isTerminated),
   };
+  // Compose the display name from first/last when `name` is absent (spec §4).
+  if (!payload.name && (payload.firstName || payload.lastName)) {
+    payload.name = `${payload.firstName || ''} ${payload.lastName || ''}`.trim();
+  }
 
   if (userType) payload.userType = userType;
   if (status) payload.status = status;
@@ -155,17 +164,14 @@ const logoutUser = asyncHandler(async (req, res) => {
 });
 
 /**
- * POST /api/users/register — public sign-up.
- * Security: `superadmin` / `admin` roles are FORCED down to `customer` here —
- * privileged accounts can only be created by staff via POST /user.
+ * POST /api/users/register — public sign-up (customer ONLY).
+ * Security: EVERY public registration is forced to `customer` — staff
+ * accounts (superadmin/admin/manager/...) can only be created from the
+ * portal by authorised staff via POST /user (spec §2 permission matrix).
  */
 const registerUser = asyncHandler(async (req, res) => {
-  const requestedType = normalizeType(req.body.userType || req.body.role);
-  // Never allow self-registration as staff leadership.
-  const safeType =
-    requestedType === ROLES.SUPERADMIN || requestedType === ROLES.ADMIN
-      ? ROLES.CUSTOMER
-      : requestedType || ROLES.CUSTOMER;
+  // Public self-registration is customer-only. Always.
+  const safeType = ROLES.CUSTOMER;
 
   const payload = buildUserPayload(
     { ...req.body, userType: safeType },
@@ -193,9 +199,11 @@ const registerUser = asyncHandler(async (req, res) => {
 });
 
 /**
- * POST /api/users/user — staff-only account creation (admin+).
+ * POST /api/users/user — portal account creation (spec §4: First Name,
+ * Last Name, Email, Phone, CNIC, CNIC Front/Back, Role, Status).
  * Only a superadmin may create `superadmin` or `admin` accounts; an admin
- * creating one gets a 403. Route is additionally guarded by `requireAdmin`.
+ * creating one gets a 403. Admins MAY create manager/customer/legacy-staff
+ * accounts. Route is additionally guarded by `requireAdmin`.
  */
 const createUser = asyncHandler(async (req, res) => {
   const payload = buildUserPayload(req.body, { isCreate: true });
@@ -225,30 +233,46 @@ const createUser = asyncHandler(async (req, res) => {
 });
 
 /**
- * GET /api/users/user — list users with optional filters.
- * Query params: `?search=…&userType=…&status=…`
+ * GET /api/users/user — scoped list with optional filters.
+ * Query params: `?search=…&userType=…&status=…&managerId=…`
+ * Scoping (spec §2): superadmin/admin/staff see all; managers see
+ * ASSIGNED-only (their customers + themselves); customers see OWN-only.
  */
 const getAllUsers = asyncHandler(async (req, res) => {
   const { search, userType, status } = req.query;
-  const where = {};
+  const role = req.user?.userType;
+  const and = [];
 
   if (userType) {
     const type = normalizeType(userType);
-    if (type) where.userType = type;
+    if (type) and.push({ userType: type });
   }
   if (status) {
     const st = normalizeStatus(status);
-    if (st) where.status = st;
+    if (st) and.push({ status: st });
   }
   if (search) {
     // NOTE: `Op.like` works on SQLite + Postgres; swap to Op.iLike for
     // case-insensitive Postgres-only search if needed.
-    where[Op.or] = [
-      { name: { [Op.like]: `%${search}%` } },
-      { email: { [Op.like]: `%${search}%` } },
-    ];
+    and.push({
+      [Op.or]: [
+        { name: { [Op.like]: `%${search}%` } },
+        { email: { [Op.like]: `%${search}%` } },
+      ],
+    });
+  }
+  // Superadmin/admin may filter by assigned manager (assignment screens).
+  if (req.query.managerId && [ROLES.SUPERADMIN, ROLES.ADMIN].includes(role)) {
+    and.push({ managerId: req.query.managerId });
+  }
+  // Row-level scoping: assigned-only for managers, own-only for customers.
+  if (role === ROLES.MANAGER) {
+    and.push({ [Op.or]: [{ managerId: req.userId }, { id: req.userId }] });
+  } else if (role === ROLES.CUSTOMER) {
+    and.push({ id: req.userId });
   }
 
+  const where = and.length ? { [Op.and]: and } : {};
   const users = await User.findAll({
     where,
     attributes: { exclude: ['password'] },
@@ -266,6 +290,8 @@ const getAllUsers = asyncHandler(async (req, res) => {
 
 /**
  * GET /api/users/user/:id — fetch one user by id (no password hash).
+ * Scoped: managers may open assigned customers + themselves; customers
+ * may open themselves; staff may open anyone.
  */
 const getUserById = asyncHandler(async (req, res) => {
   const user = await User.findByPk(req.params.id, {
@@ -274,7 +300,42 @@ const getUserById = asyncHandler(async (req, res) => {
   if (!user) {
     return fail(res, { status: 404, message: 'User not found' });
   }
+
+  const role = req.user?.userType;
+  const isSelf = Number(req.params.id) === Number(req.userId);
+  const isAssignedToManager =
+    role === ROLES.MANAGER && Number(user.managerId) === Number(req.userId);
+  const isStaffReader = [
+    ROLES.SUPERADMIN,
+    ROLES.ADMIN,
+    ROLES.SALES,
+    ROLES.TEAMLEAD,
+    ROLES.EMPLOYEE,
+    ROLES.INVENTORY,
+  ].includes(role);
+  if (!isSelf && !isAssignedToManager && !isStaffReader) {
+    return fail(res, { status: 403, message: 'You cannot view this user' });
+  }
   return success(res, { message: 'User fetched', data: sanitizeUser(user) });
+});
+
+/**
+ * GET /api/users/managers — active manager accounts for the Super Admin
+ * "assign manager" dropdown (spec §8 step 3). Superadmin + admin only.
+ */
+const getManagers = asyncHandler(async (req, res) => {
+  if (![ROLES.SUPERADMIN, ROLES.ADMIN].includes(req.user?.userType)) {
+    return fail(res, { status: 403, message: 'You cannot view the manager list' });
+  }
+  const managers = await User.findAll({
+    where: { userType: ROLES.MANAGER, status: 'active' },
+    attributes: { exclude: ['password'] },
+    order: [['name', 'ASC']],
+  });
+  return success(res, {
+    message: 'Managers fetched',
+    data: managers.map(sanitizeUser),
+  });
 });
 
 /**
@@ -340,6 +401,15 @@ const updateUser = asyncHandler(async (req, res) => {
     delete payload.isTerminated;
     delete payload.isTeamLead;
     delete payload.teamLeadId;
+    delete payload.managerId; // only Super Admin assigns managers (spec §8.3)
+  }
+
+  // Manager assignment is a Super-Admin-only action — admins included.
+  if (!isSuper && payload.managerId !== undefined && payload.managerId !== user.managerId) {
+    return fail(res, {
+      status: 403,
+      message: 'Only a superadmin can assign managers',
+    });
   }
 
   // Admins (non-super) cannot promote anyone INTO leadership roles...
@@ -414,5 +484,6 @@ module.exports = {
   registerUser,
   getUserById,
   getUsersByTeamLead,
+  getManagers,
   getMe,
 };

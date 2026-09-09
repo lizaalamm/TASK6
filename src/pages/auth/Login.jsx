@@ -42,6 +42,7 @@ import { seedInitialData } from '../../services/localStorage';
 const demoCredentials = [
   { role: 'Super Admin', email: 'superadmin@udevs.com', password: 'Super@123', color: '#7B1FA2' },
   { role: 'Admin', email: 'admin@udevs.com', password: 'Admin@123', color: '#C62828' },
+  { role: 'Manager', email: 'manager@udevs.com', password: 'Manager@123', color: '#00838F' },
   { role: 'Sales', email: 'sales@udevs.com', password: 'Sales@123', color: '#2E7D32' },
   { role: 'Inventory', email: 'inventory@udevs.com', password: 'Inventory@123', color: '#EF6C00' },
   { role: 'Team Lead', email: 'lead@udevs.com', password: 'Lead@1234', color: '#1565C0' },

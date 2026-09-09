@@ -17,9 +17,10 @@ import {
   useTheme,
 } from '@mui/material';
 import { getCarById } from '../../services/carService';
-import { addApplication } from '../../services/applicationService';
+import { createApplication } from '../../services/applicationService';
 import { useAuth } from '../../context/AuthContext';
 import { validateCNIC, validatePhone, validateEmail } from '../../utils/validation';
+import { APPLICATION_STATUS } from '../../constants/applicationStatus';
 
 const ApplyForCar = () => {
   const { carId } = useParams();
@@ -30,10 +31,15 @@ const ApplyForCar = () => {
   const [loading, setLoading] = useState(true);
   const [activeStep, setActiveStep] = useState(0);
   const [errors, setErrors] = useState({});
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
   const [formData, setFormData] = useState({
-    name: '',
+    firstName: '',
+    lastName: '',
     email: '',
     cnic: '',
+    cnicFront: '',
+    cnicBack: '',
     phone: '',
     address: '',
     city: '',
@@ -54,11 +60,16 @@ const ApplyForCar = () => {
 
   useEffect(() => {
     if (user) {
+      const parts = String(user.name || '').trim().split(/\s+/);
       setFormData(prev => ({
         ...prev,
-        name: user.name || '',
+        firstName: user.firstName || parts[0] || '',
+        lastName: user.lastName || (parts.length > 1 ? parts.slice(1).join(' ') : ''),
         email: user.email || '',
         phone: user.phone || '',
+        cnic: user.cnic || '',
+        cnicFront: user.cnic_front || user.cnicFront || '',
+        cnicBack: user.cnic_back || user.cnicBack || '',
         address: user.address || '',
         city: user.city || '',
       }));
@@ -75,7 +86,8 @@ const ApplyForCar = () => {
 
   const validateForm = () => {
     const newErrors = {};
-    if (!formData.name) newErrors.name = 'Full name is required';
+    if (!formData.firstName) newErrors.firstName = 'First name is required';
+    if (!formData.lastName) newErrors.lastName = 'Last name is required';
     if (!formData.email) newErrors.email = 'Email is required';
     else if (!validateEmail(formData.email)) newErrors.email = 'Invalid email format';
     if (!formData.cnic) newErrors.cnic = 'CNIC is required';
@@ -90,33 +102,53 @@ const ApplyForCar = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validateForm()) return;
 
+    // Spec §7 allowed fields + §8 step 1 (customer creates → PENDING).
     const applicationData = {
-      customerId: user?.id || 'GUEST',
+      customerId: user?.id,
+      firstName: formData.firstName,
+      lastName: formData.lastName,
+      email: formData.email,
+      cnic: formData.cnic,
+      cnicFront: formData.cnicFront,
+      cnicBack: formData.cnicBack,
+      phone: formData.phone,
+      address: formData.address,
+      city: formData.city,
       carId: car.id,
       selectedColor: formData.color,
+      color: formData.color,
       carMake: car.make,
       carModel: car.model,
       carVariant: car.variant,
       carImage: car.images?.[0] || '',
-      customerName: formData.name,
+      customerName: `${formData.firstName} ${formData.lastName}`.trim(),
       customerEmail: formData.email,
       customerPhone: formData.phone,
       customerAddress: formData.address,
       customerCity: formData.city,
       notes: formData.notes,
+      status: APPLICATION_STATUS.PENDING,
     };
 
-    addApplication(applicationData);
-    navigate('/application-success', { 
-      state: { 
-        carName: `${car.make} ${car.model}`,
-        applicationId: applicationData.id,
-      } 
-    });
+    setSubmitting(true);
+    setSubmitError('');
+    try {
+      const created = await createApplication(applicationData);
+      navigate('/application-success', {
+        state: {
+          carName: `${car.make} ${car.model}`,
+          applicationId: created?.id,
+        }
+      });
+    } catch (err) {
+      setSubmitError(err?.response?.data?.message || err?.message || 'Could not submit the application.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (loading) return <Box>Loading...</Box>;
@@ -150,15 +182,32 @@ const ApplyForCar = () => {
                     </Alert>
                   </Grid>
 
+                  {submitError && (
+                    <Grid item xs={12}>
+                      <Alert severity="error">{submitError}</Alert>
+                    </Grid>
+                  )}
                   <Grid item xs={12} sm={6}>
                     <TextField
                       fullWidth
-                      label="Full Name"
-                      name="name"
-                      value={formData.name}
+                      label="First Name"
+                      name="firstName"
+                      value={formData.firstName}
                       onChange={handleChange}
-                      error={!!errors.name}
-                      helperText={errors.name}
+                      error={!!errors.firstName}
+                      helperText={errors.firstName}
+                      required
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      label="Last Name"
+                      name="lastName"
+                      value={formData.lastName}
+                      onChange={handleChange}
+                      error={!!errors.lastName}
+                      helperText={errors.lastName}
                       required
                     />
                   </Grid>
@@ -199,6 +248,26 @@ const ApplyForCar = () => {
                       error={!!errors.phone}
                       helperText={errors.phone || 'Format: 03XX-XXXXXXX'}
                       required
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      label="CNIC Front (URL)"
+                      name="cnicFront"
+                      value={formData.cnicFront}
+                      onChange={handleChange}
+                      placeholder="https://…"
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      label="CNIC Back (URL)"
+                      name="cnicBack"
+                      value={formData.cnicBack}
+                      onChange={handleChange}
+                      placeholder="https://…"
                     />
                   </Grid>
                   <Grid item xs={12}>
@@ -251,8 +320,9 @@ const ApplyForCar = () => {
                         variant="contained"
                         fullWidth
                         size="large"
+                        disabled={submitting}
                       >
-                        Submit Application
+                        {submitting ? 'Submitting...' : 'Submit Application'}
                       </Button>
                     </Box>
                   </Grid>

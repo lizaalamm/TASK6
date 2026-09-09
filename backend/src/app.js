@@ -15,6 +15,9 @@ const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const userRoutes = require('./routes/userRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const applicationRoutes = require('./routes/applicationRoutes');
+const vehicleRoutes = require('./routes/vehicleRoutes');
+const paymentRoutes = require('./routes/paymentRoutes');
 const env = require('./config/env');
 const { notFound, errorHandler } = require('./middleware/errorMiddleware');
 
@@ -54,6 +57,9 @@ app.get('/api/health', (req, res) => {
 // --- Feature routers -----------------------------------------------------------
 app.use('/api/users', userRoutes);
 app.use('/api/admin', adminRoutes); // superadmin-only system endpoints
+app.use('/api/applications', applicationRoutes); // application-to-delivery pipeline
+app.use('/api/vehicles', vehicleRoutes); // vehicle catalogue
+app.use('/api/payments', paymentRoutes); // payment records
 
 // --- Fallbacks: 404 for unknown routes, then the central error formatter -----
 app.use(notFound);

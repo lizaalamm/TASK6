@@ -93,6 +93,17 @@ const Sidebar = ({
       ];
     }
 
+    // Case manager: assigned-only workspace (spec §6).
+    if (role === ROLES.MANAGER) {
+      return [
+        { text: 'Dashboard', icon: <Dashboard />, path: '/manager-dashboard' },
+        { text: 'Applications', icon: <Assignment />, path: '/applications' },
+        { text: 'My Customers', icon: <People />, path: '/customers' },
+        { text: 'Cars', icon: <DirectionsCar />, path: '/cars' },
+        { text: 'Reports', icon: <BarChart />, path: '/reports' },
+      ];
+    }
+
     // Sales-side staff: storefront-facing screens.
     if ([ROLES.SALES, ROLES.EMPLOYEE, ROLES.TEAMLEAD].includes(role)) {
       return [

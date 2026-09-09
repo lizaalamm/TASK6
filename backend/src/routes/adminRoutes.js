@@ -13,6 +13,7 @@ const express = require('express');
 const {
   getSystemStats,
   getAdminAccounts,
+  getAuditLogs,
 } = require('../controllers/adminController');
 const {
   isAuthenticated,
@@ -26,5 +27,6 @@ router.use(isAuthenticated, requireSuperAdmin);
 
 router.get('/stats', getSystemStats);
 router.get('/admins', getAdminAccounts);
+router.get('/audit-logs', getAuditLogs);
 
 module.exports = router;

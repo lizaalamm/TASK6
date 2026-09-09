@@ -36,6 +36,22 @@ export const seedUsers = [
     address: '123 Main Street, Lahore',
     city: 'Lahore',
   },
+  {
+    id: 'USR005',
+    email: 'manager@udevs.com',
+    password: 'Manager@123',
+    name: 'Case Manager',
+    role: 'manager',
+    phone: '0321-0000001',
+  },
+  {
+    id: 'USR006',
+    email: 'superadmin@udevs.com',
+    password: 'Super@123',
+    name: 'Super Admin',
+    role: 'superadmin',
+    phone: '0321-0000000',
+  },
 ];
 
 export const seedSuppliers = [
@@ -356,6 +372,8 @@ export const seedActivityLogs = [
   },
 ];
 
+export const seedPayments = [];
+
 export const seedData = {
   udevs_users: seedUsers,
   udevs_suppliers: seedSuppliers,
@@ -363,4 +381,5 @@ export const seedData = {
   udevs_customers: seedCustomers,
   udevs_applications: seedApplications,
   udevs_activity_logs: seedActivityLogs,
+  udevs_payments: seedPayments,
 };
