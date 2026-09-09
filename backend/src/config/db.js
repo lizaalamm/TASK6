@@ -1,6 +1,16 @@
+/**
+ * backend/src/config/db.js
+ * ----------------------------------------------------------------------------
+ * Shared Sequelize instance. Dialect is env-driven:
+ *  - `postgres` (default) → production-grade database
+ *  - `sqlite`             → zero-setup local/demo file database
+ * SQL logging is ON in development, OFF otherwise.
+ * ----------------------------------------------------------------------------
+ */
 const { Sequelize } = require('sequelize');
 const env = require('./env');
 
+// Verbose SQL in dev only — keeps production logs clean.
 const logging = env.isDev ? console.log : false;
 
 const sequelize =
@@ -17,6 +27,7 @@ const sequelize =
         logging,
       });
 
+// Eager connection probe so misconfiguration shows up immediately on import.
 sequelize
   .authenticate()
   .then(() =>

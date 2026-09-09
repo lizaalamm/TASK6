@@ -10,6 +10,7 @@ export const getUserByIdApi = async (id) => {
   return response.data;
 };
 
+/** POST /users/user — create a user (admin+ only). */
 export const createUserApi = async (payload) => {
   const response = await api.post('/users/user', payload);
   return response.data;

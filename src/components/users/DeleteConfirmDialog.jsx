@@ -1,3 +1,11 @@
+/**
+ * src/components/users/DeleteConfirmDialog.jsx
+ * ----------------------------------------------------------------------------
+ * Reusable "are you sure?" dialog for destructive actions (user deletion).
+ * Shows the target's name + any API error, with a loading-aware confirm
+ * button. Parent owns open/close state and the actual delete dispatch.
+ * ----------------------------------------------------------------------------
+ */
 import React from 'react';
 import {
   Dialog,

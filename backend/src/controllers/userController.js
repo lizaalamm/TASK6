@@ -1,23 +1,38 @@
+/**
+ * backend/src/controllers/userController.js
+ * ----------------------------------------------------------------------------
+ * HTTP handlers for every `/api/users/*` endpoint (auth + user management).
+ *
+ * Permission summary:
+ *  - register/login/logout : public
+ *  - me / list / detail    : any authenticated user
+ *  - create (POST /user)   : admin+, but ONLY superadmin may create
+ *                            `superadmin` (or `admin`) accounts
+ *  - update (PUT)          : self-service for own profile; admins can edit
+ *                            lower-ranked accounts; superadmin accounts are
+ *                            editable by superadmins only
+ *  - delete (DELETE)       : admin+, but superadmin accounts can only be
+ *                            deleted by another superadmin (never yourself)
+ * ----------------------------------------------------------------------------
+ */
 const asyncHandler = require('express-async-handler');
 const { Op } = require('sequelize');
 const { User } = require('../models');
 const { sanitizeUser } = require('../utils/sanitizeUser');
 const { success, fail } = require('../utils/apiResponse');
+const { ROLES, ALLOWED_TYPES } = require('../constants/roles');
 const {
   generateToken,
   setTokenCookie,
   clearTokenCookie,
 } = require('../services/tokenService');
 
-const ALLOWED_TYPES = [
-  'admin',
-  'employee',
-  'teamlead',
-  'sales',
-  'inventory',
-  'customer',
-];
-
+/**
+ * Normalise any raw role string into a canonical role (or undefined).
+ * Accepts legacy aliases (`user` → employee, `manager` → teamlead, ...).
+ * @param {string} value - Raw role / userType input.
+ * @returns {string|undefined} Canonical role, or undefined when unknown.
+ */
 const normalizeType = (value) => {
   if (!value) return undefined;
   const raw = String(value).trim().toLowerCase();
@@ -25,12 +40,21 @@ const normalizeType = (value) => {
     user: 'employee',
     manager: 'teamlead',
     'team-lead': 'teamlead',
+    team_lead: 'teamlead',
     teamlead: 'teamlead',
+    'super-admin': 'superadmin',
+    super_admin: 'superadmin',
+    superadmin: 'superadmin',
   };
   const mapped = aliases[raw] || raw;
   return ALLOWED_TYPES.includes(mapped) ? mapped : undefined;
 };
 
+/**
+ * Normalise a status string into `active` / `inactive` (or undefined).
+ * @param {string} value - Raw status input.
+ * @returns {string|undefined} Canonical status, or undefined when unknown.
+ */
 const normalizeStatus = (value) => {
   if (!value) return undefined;
   const raw = String(value).trim().toLowerCase();
@@ -38,6 +62,13 @@ const normalizeStatus = (value) => {
   return undefined;
 };
 
+/**
+ * Whitelist + normalise user fields coming from `req.body`.
+ * Only known columns are picked, so clients can never mass-assign internals.
+ * @param {object} body - Raw request body.
+ * @param {{isCreate?: boolean}} opts - On create, default role to `employee`.
+ * @returns {object} Clean payload ready for Sequelize.
+ */
 const buildUserPayload = (body, { isCreate = false } = {}) => {
   const userType = normalizeType(body.userType || body.role);
   const status = normalizeStatus(body.status);
@@ -59,12 +90,13 @@ const buildUserPayload = (body, { isCreate = false } = {}) => {
 
   if (userType) payload.userType = userType;
   if (status) payload.status = status;
-  if (body.password) payload.password = body.password;
+  if (body.password) payload.password = body.password; // hashed by model hook
 
   if (isCreate && !payload.userType) {
     payload.userType = 'employee';
   }
 
+  // Drop `undefined` keys so partial updates don't null-out columns.
   Object.keys(payload).forEach((key) => {
     if (payload[key] === undefined) delete payload[key];
   });
@@ -72,6 +104,10 @@ const buildUserPayload = (body, { isCreate = false } = {}) => {
   return payload;
 };
 
+/**
+ * POST /api/users/login — verify credentials and issue a JWT.
+ * Response contains the token twice (top-level + `data`) for client compat.
+ */
 const loginUser = asyncHandler(async (req, res) => {
   const email = String(req.body.email || '')
     .trim()
@@ -88,6 +124,7 @@ const loginUser = asyncHandler(async (req, res) => {
     return fail(res, { status: 401, message: 'Invalid credentials' });
   }
 
+  // Blocked accounts can never obtain a token.
   if (user.status === 'inactive' || user.isTerminated) {
     return fail(res, {
       status: 403,
@@ -109,14 +146,29 @@ const loginUser = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * POST /api/users/logout — clear the auth cookie (stateless JWT on top).
+ */
 const logoutUser = asyncHandler(async (req, res) => {
   clearTokenCookie(res);
   return success(res, { message: 'Logged out successfully', data: {} });
 });
 
+/**
+ * POST /api/users/register — public sign-up.
+ * Security: `superadmin` / `admin` roles are FORCED down to `customer` here —
+ * privileged accounts can only be created by staff via POST /user.
+ */
 const registerUser = asyncHandler(async (req, res) => {
+  const requestedType = normalizeType(req.body.userType || req.body.role);
+  // Never allow self-registration as staff leadership.
+  const safeType =
+    requestedType === ROLES.SUPERADMIN || requestedType === ROLES.ADMIN
+      ? ROLES.CUSTOMER
+      : requestedType || ROLES.CUSTOMER;
+
   const payload = buildUserPayload(
-    { ...req.body, userType: req.body.userType || req.body.role || 'customer' },
+    { ...req.body, userType: safeType },
     { isCreate: true }
   );
 
@@ -140,8 +192,25 @@ const registerUser = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * POST /api/users/user — staff-only account creation (admin+).
+ * Only a superadmin may create `superadmin` or `admin` accounts; an admin
+ * creating one gets a 403. Route is additionally guarded by `requireAdmin`.
+ */
 const createUser = asyncHandler(async (req, res) => {
   const payload = buildUserPayload(req.body, { isCreate: true });
+  const requesterIsSuper = req.user?.userType === ROLES.SUPERADMIN;
+
+  // Guard the leadership roles: admins cannot mint admins/superadmins.
+  if (
+    (payload.userType === ROLES.SUPERADMIN || payload.userType === ROLES.ADMIN) &&
+    !requesterIsSuper
+  ) {
+    return fail(res, {
+      status: 403,
+      message: 'Only a superadmin can create admin accounts',
+    });
+  }
 
   if (await User.emailExists(payload.email)) {
     return fail(res, { status: 409, message: 'Email is already registered' });
@@ -155,6 +224,10 @@ const createUser = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * GET /api/users/user — list users with optional filters.
+ * Query params: `?search=…&userType=…&status=…`
+ */
 const getAllUsers = asyncHandler(async (req, res) => {
   const { search, userType, status } = req.query;
   const where = {};
@@ -168,6 +241,8 @@ const getAllUsers = asyncHandler(async (req, res) => {
     if (st) where.status = st;
   }
   if (search) {
+    // NOTE: `Op.like` works on SQLite + Postgres; swap to Op.iLike for
+    // case-insensitive Postgres-only search if needed.
     where[Op.or] = [
       { name: { [Op.like]: `%${search}%` } },
       { email: { [Op.like]: `%${search}%` } },
@@ -189,6 +264,9 @@ const getAllUsers = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * GET /api/users/user/:id — fetch one user by id (no password hash).
+ */
 const getUserById = asyncHandler(async (req, res) => {
   const user = await User.findByPk(req.params.id, {
     attributes: { exclude: ['password'] },
@@ -199,6 +277,10 @@ const getUserById = asyncHandler(async (req, res) => {
   return success(res, { message: 'User fetched', data: sanitizeUser(user) });
 });
 
+/**
+ * GET /api/users/me — return the currently logged-in user.
+ * Used by the frontend to restore sessions after a page reload.
+ */
 const getMe = asyncHandler(async (req, res) => {
   const user = await User.findByPk(req.userId, {
     attributes: { exclude: ['password'] },
@@ -216,6 +298,13 @@ const getMe = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * PUT /api/users/user/:id (or PUT /user with `id` in body) — update a user.
+ *  - Regular users: may edit ONLY their own profile, and never privilege
+ *    fields (role / status / termination / team links).
+ *  - Admins: may edit lower-ranked accounts but NOT superadmin accounts.
+ *  - Superadmins: may edit anyone, including role changes.
+ */
 const updateUser = asyncHandler(async (req, res) => {
   const id = req.params.id || req.body.id || req.userId;
   if (!id) {
@@ -223,7 +312,11 @@ const updateUser = asyncHandler(async (req, res) => {
   }
 
   const isSelf = Number(id) === Number(req.userId);
-  const isAdmin = req.user?.userType === 'admin';
+  const requesterRole = req.user?.userType;
+  const isSuper = requesterRole === ROLES.SUPERADMIN;
+  const isAdmin = requesterRole === ROLES.ADMIN || isSuper;
+
+  // Non-admins can only touch their own profile.
   if (!isSelf && !isAdmin) {
     return fail(res, { status: 403, message: 'You can only update your own profile' });
   }
@@ -233,7 +326,14 @@ const updateUser = asyncHandler(async (req, res) => {
     return fail(res, { status: 404, message: 'User not found' });
   }
 
+  // Superadmin accounts are untouchable for plain admins.
+  if (user.userType === ROLES.SUPERADMIN && !isSuper) {
+    return fail(res, { status: 403, message: 'Only a superadmin can edit superadmin accounts' });
+  }
+
   const payload = buildUserPayload(req.body);
+
+  // Strip privilege fields for non-admin self edits.
   if (!isAdmin) {
     delete payload.userType;
     delete payload.status;
@@ -241,13 +341,31 @@ const updateUser = asyncHandler(async (req, res) => {
     delete payload.isTeamLead;
     delete payload.teamLeadId;
   }
-  if (!payload.password) delete payload.password;
+
+  // Admins (non-super) cannot promote anyone INTO leadership roles...
+  if (!isSuper && (payload.userType === ROLES.SUPERADMIN || payload.userType === ROLES.ADMIN)) {
+    return fail(res, {
+      status: 403,
+      message: 'Only a superadmin can assign admin roles',
+    });
+  }
+  // ...nor demote/edit existing admins & superadmins.
+  if (!isSuper && (user.userType === ROLES.ADMIN || user.userType === ROLES.SUPERADMIN)) {
+    return fail(res, { status: 403, message: 'Only a superadmin can manage admin accounts' });
+  }
+
+  if (!payload.password) delete payload.password; // keep old hash when blank
 
   await user.update(payload);
   const updated = await User.findByPk(id, { attributes: { exclude: ['password'] } });
   return success(res, { message: 'User updated', data: sanitizeUser(updated) });
 });
 
+/**
+ * DELETE /api/users/user/:id — delete a user (admin+).
+ *  - You can never delete your own account (prevents lock-out).
+ *  - Superadmin accounts can only be deleted by another superadmin.
+ */
 const deleteUser = asyncHandler(async (req, res) => {
   const { id } = req.params;
   if (Number(id) === Number(req.userId)) {
@@ -259,10 +377,20 @@ const deleteUser = asyncHandler(async (req, res) => {
     return fail(res, { status: 404, message: 'User not found' });
   }
 
+  if (user.userType === ROLES.SUPERADMIN && req.user?.userType !== ROLES.SUPERADMIN) {
+    return fail(res, {
+      status: 403,
+      message: 'Only a superadmin can delete superadmin accounts',
+    });
+  }
+
   await user.destroy();
   return success(res, { message: 'User deleted', data: { id: Number(id) } });
 });
 
+/**
+ * GET /api/users/teamUsers/:teamLeadId — list members of one team lead.
+ */
 const getUsersByTeamLead = asyncHandler(async (req, res) => {
   const { teamLeadId } = req.params;
   const users = await User.findAll({

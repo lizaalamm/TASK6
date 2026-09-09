@@ -1,3 +1,13 @@
+/**
+ * src/App.jsx
+ * ----------------------------------------------------------------------------
+ * Application root: wires providers (theme → auth → router) and seeds the
+ * local demo catalogue on first load.
+ *
+ * Provider nesting (outer → inner):
+ *  BrowserRouter → ThemeContext → MUI ThemeProvider → AuthProvider → Routes
+ * ----------------------------------------------------------------------------
+ */
 import React from 'react';
 import { BrowserRouter } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
@@ -10,12 +20,15 @@ import { seedData } from './data/seedData';
 import { seedInitialData } from './services/localStorage';
 
 function App() {
+  // Seed local demo data (cars / customers / applications) once per browser.
   React.useEffect(() => {
     seedInitialData(seedData);
   }, []);
 
+  // Light / dark mode flag shared via ThemeContext (toggled in TopBar).
   const [darkMode, setDarkMode] = React.useState(false);
 
+  // Rebuild the MUI theme object only when the mode flips.
   const theme = React.useMemo(
     () => createTheme(darkMode ? darkBrownTheme : brownTheme),
     [darkMode]
